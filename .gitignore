@@ -5,3 +5,4 @@
 dataset
 docs
 *.egg-info
+*.pt

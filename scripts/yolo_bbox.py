@@ -70,7 +70,24 @@ frames_len = len(os.listdir(frames_path))
 dataset_rows = []
 i = 0
 
+# create set of images already processed 
+processed_images = set()
+try: 
+    df = pd.read_csv(csv_path)
+    processed_images = set(df[0].to_list())
+    print(f"Found existing tracking file. Resuming pipeline. {len(processed_images)} images already annotated.")
+except Exception as e:
+    print(f"Could not read existing CSV, starting fresh. Error: {e}")
+
+frames_len = frames_len - len(processed_images)
+
+BATCH_SIZE = 9000
+
 for frame in os.scandir(frames_path):
+
+    if os.path.basename(frame) in processed_images:
+        continue
+
     bboxes = detect_vehicles(frame.path)
     flat_boxes = bboxes.flatten().tolist()
     row_data = [os.path.basename(frame.path)] + bboxes.flatten().tolist()
@@ -78,5 +95,7 @@ for frame in os.scandir(frames_path):
     i += 1
     print(f"{i}/{frames_len}")
 
-df = pd.DataFrame(dataset_rows)
-df.to_csv(csv_path, header=False, index=False)
+    if i == BATCH_SIZE:
+        df = pd.DataFrame(dataset_rows)
+        df.to_csv(csv_path, mode='a', header=False, index=False)
+        print("Finished Batch")

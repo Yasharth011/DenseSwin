@@ -140,6 +140,4 @@ class ToTensor(object):
 
         tensor = tensor.permute(1, 0, 2, 3)  # C, T, H, W
 
-        tensor = tensor.unsqueeze(0)  # B, C, T, H, W
-
         return tensor

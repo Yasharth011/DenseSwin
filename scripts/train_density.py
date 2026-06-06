@@ -1,26 +1,24 @@
-from timm.data.config import resolve_data_config
-from models import swin, DensityConv
+from models import swin3d, DensityConv
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
 from utils import TrafficDensityDataset, Rescale, ToTensor, DATASET_CONFIG
 import torch
 from datetime import datetime
 
-transform = transforms.Compose(
-    [
-        Rescale((224, 384)),
-        ToTensor(**resolve_data_config(swin.pretrained_cfg, model=swin)),
-    ]
-)
+target_size = (224, 384)
+transform = transforms.Compose([Rescale(target_size)])
+tensor_transform = transforms.Compose([ToTensor])
 
 training_set = TrafficDensityDataset(
-    DATASET_CONFIG.frames_csv,
-    DATASET_CONFIG.frames,
+    DATASET_CONFIG.main_csv,
+    DATASET_CONFIG.videos,
+    DATASET_CONFIG.csv_dir,
     transform=transform,
 )
 validation_set = TrafficDensityDataset(
-    DATASET_CONFIG.frames_csv,
-    DATASET_CONFIG.frames,
+    DATASET_CONFIG.main_csv,
+    DATASET_CONFIG.videos,
+    DATASET_CONFIG.csv_dir,
     transform=transform,
 )
 
@@ -47,12 +45,11 @@ def train_one_epoch(epoch_index, tb_writer):
 
         optimizer.zero_grad()
 
-        c5_output = swin(images)
+        swin3d_features = swin3d(images)
 
-        _, density_head = model(c5_output)
-        target_size = density_maps.shape[-2, :]
+        _, density_head = model(swin3d_features, target_size)
 
-        loss = loss_fn(density_head, density_maps, target_size)
+        loss = loss_fn(density_head, density_maps)
         loss.backward()
 
         optimizer.step()
@@ -89,15 +86,16 @@ for epoch in range(EPOCHS):
 
     # Disable gradient computation and reduce memory consumption.
     with torch.no_grad():
-        for i, vdata in enumerate(validation_loader):
-            vinputs, vlabels = vdata
-            
-            vc5_output = swin(vinputs)
-            vtarget_size = vlabels.shape[-2:]
-            
-            _, voutputs = model(vc5_output, target_size=vtarget_size)
-            
-            vloss = loss_fn(voutputs, vlabels)
+        for i, data in enumerate(validation_loader):
+            images, density_maps = data
+
+            optimizer.zero_grad()
+
+            swin3d_features = swin3d(images)
+
+            _, density_head = model(swin3d_features, target_size)
+
+            vloss = loss_fn(density_head, density_maps)
             running_vloss += vloss
 
     avg_vloss = running_vloss / (len(validation_loader) + 1)

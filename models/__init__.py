@@ -1,7 +1,7 @@
-from .backbone import swin
 from .density_module import DensityConv 
+from .video_swin import swin3d
 
 __all__ = [
-        "swin",
+	"swin3d",
         "DensityConv"
         ]

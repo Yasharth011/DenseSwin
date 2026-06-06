@@ -5,23 +5,28 @@ from torch.utils.data import Dataset
 import os
 from scipy.ndimage import gaussian_filter
 import numpy as np
+from decord import VideoReader, cpu
+import torchvision.transforms as transforms
 
 
 class TrafficDensityDataset(Dataset):
     """Traffic Dataset for Density Estimation"""
 
-    def __init__(self, csv_file, root_dir, transform=None, transform_tensor=None):
-        self.frames = pd.read_csv(csv_file)
-        self.root_dir = root_dir
+    def __init__(
+        self, csv_file, video_dir, csv_dir, transform=None, tensor_transform=None
+    ):
+        self.csv = pd.read_csv(csv_file, header=None)
+        self.video_dir = video_dir
+        self.csv_dir = csv_dir
         self.transform = transform
-        self.transform_tensor = transform_tensor
+        self.tensor_transform = tensor_transform
 
     def __len__(self):
-        return len(self.frames)
+        return len(self.csv)
 
     def _generate_map(self, image_shape, bbox):
-        H, W = image_shape
-        density_map = np.zeros(image_shape, dtype=np.float32)
+        W, H = image_shape
+        density_map = np.zeros((W, H), dtype=np.float32)
 
         for x, y, w, h in bbox:
             x, y = int(x), int(y)
@@ -41,25 +46,41 @@ class TrafficDensityDataset(Dataset):
         return density_map
 
     def __getitem__(self, idx):
+
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        img_name = os.path.join(self.root_dir, self.frames.iloc[idx, 0])
-        image = Image.open(img_name).convert("RGB")
+        video_name, csv_name = self.csv.iloc[idx]
+        video_path = os.path.join(self.video_dir, video_name)
+        csv_path = os.path.join(self.csv_dir, csv_name)
+        df = pd.read_csv(csv_path, header=None)
 
-        bbox = self.frames.iloc[idx, 1:].dropna().values.astype("float").reshape(-1, 4)
+        vr = VideoReader(video_path, ctx=cpu(0))
+        frame_list = []
+        map_list = []
 
-        sample = {"image": image, "bbox": bbox}
+        for i, data in df.iterrows():
+            image = Image.fromarray(vr[i].asnumpy())
+            bbox = data.dropna().values.astype("float").reshape(-1, 4)
 
-        if self.transform:
-            sample = self.transform(sample)
+            if self.transform:
+                image, bbox = self.transform(image, bbox)
+                map = self._generate_map(image.size, bbox)
 
-        density_array = self._generate_map(sample["image"].size, sample["bbox"])
+            else:
+                map = self._generate_map(image.size, bbox)
 
-        if self.transform_tensor:
-            sample = self.transform_tensor(sample)
+            frame_list.append(image)
+            map_list.append(map)
 
-        return {"image": image, "density_map": density_array}
+        if self.tensor_transform:
+            image = self.tensor_transform(frame_list)
+            map = self.tensor_transform(map_list)
+        else:
+            image = frame_list
+            map = map_list
+
+        return {"image": image, "density_map": map}
 
 
 class Rescale(object):
@@ -87,11 +108,7 @@ class Rescale(object):
 
         return scaled_bboxes
 
-    def __call__(self, sample):
-        image, bboxes = (
-            sample["image"],
-            sample["bbox"],
-        )
+    def __call__(self, image, bbox):
         w, h = image.size
 
         if isinstance(self.output_size, int):
@@ -106,20 +123,23 @@ class Rescale(object):
 
         img = image.resize((new_w, new_h))
 
-        bbox = self._scale_bboxes(bboxes, (h, w), (new_h, new_w))
+        scaled_bbox = self._scale_bboxes(bbox, (h, w), (new_h, new_w))
 
-        return {"image": img, "bbox": bbox}
+        return img, scaled_bbox
 
 
 class ToTensor(object):
     """Convert imgaes to tensor"""
 
-    def __init__(self, transform):
-        self.transform = transform
-
     def __call__(self, sample):
-        image, bbox = sample["image"], sample["bbox"]
+        transform = transforms.Compose([ToTensor()])
 
-        image = self.transform(image).unsqueeze(0)
+        tensor = [transform(s) for s in sample]  # C, H, W
 
-        return {"image": image, "bbox": bbox}
+        tensor = torch.stack(tensor, dim=0)  # T, C, H, W
+
+        tensor = tensor.permute(1, 0, 2, 3)  # C, T, H, W
+
+        tensor = tensor.unsqueeze(0)  # B, C, T, H, W
+
+        return tensor

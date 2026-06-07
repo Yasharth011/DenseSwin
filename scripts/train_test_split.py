@@ -11,10 +11,10 @@ for folder in folders:
     i = 1
     for file in os.scandir(folder_path):
         file_path = f"dataset/train/videos/{file.name}"
-        shutil.copy(f"{folder_path}/{file.name}", file_path)
+        shutil.move(f"{folder_path}/{file.name}", file_path)
         i = i + 1
         if i == split:
             break
     for file in os.scandir(folder_path):
         file_path = f"dataset/test/videos/{file.name}"
-        shutil.copy(f"{folder_path}/{file.name}", file_path)
+        shutil.move(f"{folder_path}/{file.name}", file_path)

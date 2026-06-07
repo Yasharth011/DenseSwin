@@ -12,7 +12,7 @@ def get_video_duration(video_path):
         "-show_entries",
         "format=duration",
         "-of",
-        "default=noprint_wrappers=1:nokey=1",  # <- FIXED LINE
+        "default=noprint_wrappers=1:nokey=1",
         video_path,
     ]
     result = subprocess.run(
@@ -38,7 +38,7 @@ def slice_video_physical(video_dir, output_root, chunk_duration):
         print(f"Physically slicing {video_file} ({duration} seconds)...")
 
         while start_time + chunk_duration <= duration:
-            output_clip_name = f"{video_name}_{clip_counter}.{video_type}"
+            output_clip_name = f"{video_name}_{clip_counter}{video_type}"
             output_clip_path = os.path.join(target_dir, output_clip_name)
 
             cmd = [

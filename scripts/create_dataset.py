@@ -1,7 +1,5 @@
 import os
-from os.path import basename
 import numpy as np
-import cv2
 import pandas as pd
 import torch
 from PIL import Image, ImageDraw
@@ -14,12 +12,12 @@ model = YOLO("yolo11x.pt")
 
 device = "0" if torch.cuda.is_available() else "cpu"
 
-# COCO indices for traffic elements (0: person, 2: car, 3: motorcycle, 5: bus, 7: truck)
-VEHICLE_CLASSES = [0, 2, 3, 5, 7]
+# COCO indices for traffic elements (2: car, 3: motorcycle, 5: bus, 7: truck)
+VEHICLE_CLASSES = [2, 3, 5, 7]
 # detecting person to detect overlapped bikes by detecting the person
 
 
-def detect_vehicles(dataset, image, file_name, conf=0.10):
+def detect_vehicles(dataset, image, annotated_name, conf=0.10):
 
     results = model.predict(
         source=image, conf=conf, classes=VEHICLE_CLASSES, verbose=False, device=device
@@ -44,8 +42,7 @@ def detect_vehicles(dataset, image, file_name, conf=0.10):
             draw.rectangle((x1, y1, x2, y2), width=2)
             draw.point((x_center, y_center))
 
-    file_name = f"annotated_{(file_name).split('.')[0]}_{i}.png"
-    image.save(os.path.join(dataset.annotated_frames, file_name))
+    image.save(os.path.join(dataset.annotated_frames, annotated_name))
 
     if len(all_boxes) > 0:
         vehicle_bboxes = np.vstack(all_boxes)
@@ -53,22 +50,6 @@ def detect_vehicles(dataset, image, file_name, conf=0.10):
         vehicle_bboxes = np.empty((0, 4))
 
     return vehicle_bboxes
-
-
-def bbox_to_csv(dataset, image, file_name):
-
-    csv_name = f"{(file_name).split('.')[0]}.csv"
-    csv_path = os.path.join(dataset.csv_dir, csv_name)
-
-    dataset_rows = []
-
-    bboxes = detect_vehicles(dataset, image, file_name).flatten().tolist()
-    dataset_rows.append(bboxes)
-
-    df = pd.DataFrame(dataset_rows)
-    df.to_csv(csv_path, mode="a", header=False, index=False)
-
-    return csv_name
 
 
 def create_dataset(dataset, BATCH_SIZE):
@@ -87,35 +68,51 @@ def create_dataset(dataset, BATCH_SIZE):
             print("Processed all videos already")
 
         print(
-            f"Found existing processed videos. Resuming pipeline. {len(processed_videos)} images already annotated."
+            f"Found existing processed videos. Resuming pipeline. {len(processed_videos)} image(s) already annotated."
         )
+        video_len = video_len - len(processed_videos)
 
     except Exception as e:
         print(f"Could not read existing CSV, starting fresh. Error: {e}")
 
     for file in os.scandir(dataset.videos):
 
+        if i > BATCH_SIZE:
+            print("Batch Complete")
+            break
+
         if file.is_file() and (file.name not in processed_videos):
 
+            print(f"{i}/{video_len}  {file.name}")
+
             vr = VideoReader(file.path, ctx=cpu(0))
+            bbox_rows = []
 
-            for i in range(len(vr)):
+            for j in range(len(vr)):
 
-                image = Image.fromarray(vr[i].asnumpy())
+                image = Image.fromarray(vr[j].asnumpy())
 
-                csv_name = bbox_to_csv(dataset, image, file.name)
+                file_name = f"{(file.name).split('.')[0]}_{j}.png"
+                annotated_name = f"annot_{(file.name).split('.')[0]}_{j}.png"
 
-                file_name = f"{(file.name).split('.')[0]}_{i}.png"
+                bbox_rows.append(
+                    detect_vehicles(dataset, image, annotated_name).flatten().tolist()
+                )
+
                 image.save(os.path.join(dataset.frames, file_name))
 
-                dataset_rows.append([file.name, csv_name])
+            csv_name = f"{(file.name).split('.')[0]}.csv"
+            csv_path = os.path.join(dataset.csv_dir, csv_name)
+            csv_df = pd.DataFrame(bbox_rows)
+            csv_df.to_csv(csv_path, mode="w", header=False, index=False)
 
-            print(f"{i}/{video_len}  {file.name}")
+            dataset_rows.append([file.name, csv_name])
+
             i = i + 1
 
-        if i == BATCH_SIZE:
-            df = pd.DataFrame(dataset_rows)
-            df.to_csv(main_csv_path, mode="a", header=False, index=False)
+    if len(dataset_rows):
+        df = pd.DataFrame(dataset_rows)
+        df.to_csv(main_csv_path, mode="a", header=False, index=False)
 
 
 if __name__ == "__main__":
@@ -127,8 +124,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.dataset == "train":
-        create_dataset(TRAIN_DATASET, args.batch)
+        create_dataset(TRAIN_DATASET, int(args.batch))
     elif args.dataset == "test":
-        create_dataset(TEST_DATASET, args.batch)
+        create_dataset(TEST_DATASET, int(args.batch))
     else:
         print("Invalid Dataset")

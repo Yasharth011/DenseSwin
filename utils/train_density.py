@@ -1,7 +1,7 @@
 from models import swin3d, DensityConv
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
-from utils import TrafficDensityDataset, Rescale, ToTensor, DATASET_CONFIG
+from utils import TrafficDensityDataset, Rescale, ToTensor, TEST_DATASET, TRAIN_DATASET
 import torch
 from datetime import datetime
 
@@ -10,15 +10,15 @@ transform = transforms.Compose([Rescale(target_size)])
 tensor_transform = transforms.Compose([ToTensor])
 
 training_set = TrafficDensityDataset(
-    DATASET_CONFIG.main_csv,
-    DATASET_CONFIG.videos,
-    DATASET_CONFIG.csv_dir,
+    TRAIN_DATASET.main_csv,
+    TRAIN_DATASET.videos,
+    TRAIN_DATASET.csv_dir,
     transform=transform,
 )
 validation_set = TrafficDensityDataset(
-    DATASET_CONFIG.main_csv,
-    DATASET_CONFIG.videos,
-    DATASET_CONFIG.csv_dir,
+    TEST_DATASET.main_csv,
+    TEST_DATASET.videos,
+    TEST_DATASET.csv_dir,
     transform=transform,
 )
 

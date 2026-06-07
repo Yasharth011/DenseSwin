@@ -17,7 +17,7 @@ VEHICLE_CLASSES = [2, 3, 5, 7]
 # detecting person to detect overlapped bikes by detecting the person
 
 
-def detect_vehicles(dataset, image, annotated_name, conf=0.10):
+def detect_vehicles(dataset, image, annotated_name, conf=0.15):
 
     results = model.predict(
         source=image, conf=conf, classes=VEHICLE_CLASSES, verbose=False, device=device
@@ -52,7 +52,7 @@ def detect_vehicles(dataset, image, annotated_name, conf=0.10):
     return vehicle_bboxes
 
 
-def create_dataset(dataset, BATCH_SIZE):
+def create_dataset(dataset, BATCH_SIZE=10, num_frames=8):
     video_path = dataset.videos
     video_len = len(os.listdir(video_path))
     main_csv_path = dataset.main_csv
@@ -86,9 +86,17 @@ def create_dataset(dataset, BATCH_SIZE):
             print(f"{i}/{video_len}  {file.name}")
 
             vr = VideoReader(file.path, ctx=cpu(0))
+
+            frames_batch = np.linspace(
+                0,
+                len(vr) - 1,
+                num=num_frames,
+                dtype=int,
+            )
+
             bbox_rows = []
 
-            for j in range(len(vr)):
+            for j in frames_batch:
 
                 image = Image.fromarray(vr[j].asnumpy())
 
@@ -121,11 +129,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dataset", help="create train dataset")
     parser.add_argument("-b", "--batch", help="size of batch to process")
+    parser.add_argument("-n", "--num_frames", help="number of frames to extract")
     args = parser.parse_args()
 
     if args.dataset == "train":
-        create_dataset(TRAIN_DATASET, int(args.batch))
+        create_dataset(TRAIN_DATASET, int(args.batch), int(args.num_frames))
     elif args.dataset == "test":
-        create_dataset(TEST_DATASET, int(args.batch))
-    else:
-        print("Invalid Dataset")
+        create_dataset(TEST_DATASET, int(args.batch), int(args.num_frames))

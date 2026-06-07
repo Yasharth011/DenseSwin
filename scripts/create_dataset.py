@@ -1,0 +1,121 @@
+import os
+from os.path import basename
+import numpy as np
+import cv2
+import pandas as pd
+import torch
+from PIL import Image, ImageDraw
+from ultralytics import YOLO
+from utils import DATASET_CONFIG
+from decord import VideoReader
+from decord import cpu
+
+model = YOLO("yolo11x.pt")
+
+device = "0" if torch.cuda.is_available() else "cpu"
+
+# COCO indices for traffic elements (0: person, 2: car, 3: motorcycle, 5: bus, 7: truck)
+VEHICLE_CLASSES = [0, 2, 3, 5, 7]
+# detecting person to detect overlapped bikes by detecting the person
+
+output_dir = str(DATASET_CONFIG.annotated_frames)
+
+
+def detect_vehicles(image, file_name, conf=0.10):
+
+    results = model.predict(
+        source=image, conf=conf, classes=VEHICLE_CLASSES, verbose=False, device=device
+    )
+
+    all_boxes = []
+
+    for result in results:
+        boxes_xyxy = result.boxes.xyxy.cpu().numpy()
+        boxes_xywh = (
+            result.boxes.xywh.cpu().numpy()
+        )  # [x_center, y_center, width, height]
+
+        if len(boxes_xywh) > 0:
+            all_boxes.append(boxes_xywh)
+
+        for xyxy, xywh in zip(boxes_xyxy, boxes_xywh):
+            x1, y1, x2, y2 = map(int, xyxy)
+            x_center, y_center = int(xywh[0]), int(xywh[1])
+
+            draw = ImageDraw.Draw(image)
+            draw.rectangle((x1, y1, x2, y2), width=2)
+            draw.point((x_center, y_center))
+
+    file_name = f"annotated_{(file_name).split('.')[0]}_{i}.png"
+    image.save(os.path.join(DATASET_CONFIG.annotated_frames, file_name))
+
+    if len(all_boxes) > 0:
+        vehicle_bboxes = np.vstack(all_boxes)
+    else:
+        vehicle_bboxes = np.empty((0, 4))
+
+    return vehicle_bboxes
+
+
+def bbox_to_csv(image, file_name):
+
+    csv_name = f"{(file_name).split('.')[0]}.csv"
+    csv_path = os.path.join(DATASET_CONFIG.csv_dir, csv_name)
+
+    dataset_rows = []
+
+    bboxes = detect_vehicles(image, file_name).flatten().tolist()
+    dataset_rows.append(bboxes)
+
+    df = pd.DataFrame(dataset_rows)
+    df.to_csv(csv_path, mode="a", header=False, index=False)
+
+    return csv_name
+
+
+if __name__ == "__main__":
+
+    try:
+        video_path = DATASET_CONFIG.videos
+        video_len = len(os.listdir(video_path))
+        main_csv_path = DATASET_CONFIG.main_csv
+        videos_len = len(os.listdir(video_path))
+        i = 1
+        dataset_rows = []
+        BATCH_SIZE = 10
+
+        processed_videos = set()
+        try:
+            df = pd.read_csv(main_csv_path, header=None)
+            processed_videos = set(df[0].to_list())
+            print(f"Found existing processed videos. Resuming pipeline. {len(processed_videos)} images already annotated.")
+        except Exception as e:
+            print(f"Could not read existing CSV, starting fresh. Error: {e}")
+
+        for file in os.scandir(DATASET_CONFIG.videos):
+
+            if file.is_file() and (file.name not in processed_videos):
+
+                vr = VideoReader(file.path, ctx=cpu(0))
+
+                for i in range(len(vr)):
+
+                    image = Image.fromarray(vr[i].asnumpy())
+
+                    csv_name = bbox_to_csv(image, file.name)
+
+                    file_name = f"{(file.name).split('.')[0]}_{i}.png"
+                    image.save(os.path.join(DATASET_CONFIG.frames, file_name))
+
+                    dataset_rows.append([file.name, csv_name])
+
+                print(f"{i}/{video_len}  {file.name}")
+                i = i + 1
+
+            if i==BATCH_SIZE:
+                df = pd.DataFrame(dataset_rows)
+                df.to_csv(main_csv_path, mode='a', header=False, index=False)
+
+
+    except Exception as e:
+        print(f"Error: {str(e)}")

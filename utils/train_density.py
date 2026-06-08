@@ -1,13 +1,19 @@
 from models import swin3d, DensityConv
-import torchvision.transforms as transforms
+import torchvision.transforms as v2
 from torch.utils.tensorboard import SummaryWriter
 from utils import TrafficDensityDataset, ToDensityMap, TEST_DATASET, TRAIN_DATASET
 import torch
 from datetime import datetime
 
 target_size = (224, 384)
-transform = transforms.Compose(
-    [ToDensityMap, transforms.Resize(target_size), transforms.ToTensor]
+transform = v2.Compose(
+    [
+        v2.Resize(target_size),
+        ToDensityMap(),
+        v2.ToImage(),
+        v2.ToDtype(torch.float32, scale=True),
+        v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ]
 )
 
 training_set = TrafficDensityDataset(

@@ -2,6 +2,7 @@ from PIL import Image
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
+from torchvision.tv_tensors import BoundingBoxes
 import os
 from scipy.ndimage import gaussian_filter
 import numpy as np
@@ -31,7 +32,7 @@ class TrafficDensityDataset(Dataset):
         video_name, csv_name = self.csv.iloc[idx]
         video_path = os.path.join(self.video_dir, video_name)
         csv_path = os.path.join(self.csv_dir, csv_name)
-        df = pd.read_csv(csv_path, header=None)
+        df = pd.read_csv(csv_path, header=None, index_col=0)
 
         vr = VideoReader(video_path, ctx=cpu(0))
 
@@ -43,18 +44,20 @@ class TrafficDensityDataset(Dataset):
 
             if self.transform:
                 bbox = data.dropna().values.astype("float").reshape(-1, 4)
-                frame = self.transform({"frame": frame, "bbox": bbox})
+                bbox = BoundingBoxes(
+                    bbox, format="XYWH", canvas_size=(frame.height, frame.width)
+                )
+                frame = self.transform(frame, bbox)
 
             frame_list.append(frame)
 
         return frame_list
 
 
-class ToDensityMap(object):
+class ToDensityMap(torch.nn.Module):
     """Convert images to density maps"""
 
-    def __call__(self, sample):
-        image, bbox = sample.values()
+    def forward(self, image, bbox):
         W, H = image.size
         density_map = np.zeros((W, H), dtype=np.float32)
 

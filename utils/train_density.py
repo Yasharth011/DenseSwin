@@ -1,13 +1,14 @@
 from models import swin3d, DensityConv
 import torchvision.transforms as transforms
 from torch.utils.tensorboard import SummaryWriter
-from utils import TrafficDensityDataset, Rescale, ToTensor, TEST_DATASET, TRAIN_DATASET
+from utils import TrafficDensityDataset, ToDensityMap, TEST_DATASET, TRAIN_DATASET
 import torch
 from datetime import datetime
 
 target_size = (224, 384)
-transform = transforms.Compose([Rescale(target_size)])
-tensor_transform = transforms.Compose([ToTensor])
+transform = transforms.Compose(
+    [ToDensityMap, transforms.Resize(target_size), transforms.ToTensor]
+)
 
 training_set = TrafficDensityDataset(
     TRAIN_DATASET.main_csv,
@@ -41,15 +42,18 @@ def train_one_epoch(epoch_index, tb_writer):
     last_loss = 0
 
     for i, data in enumerate(training_loader):
-        images, density_maps = data
+
+        # create 5D tensor
+        tensor = torch.stack(data, dim=0)
+        tensor = tensor.permute(1, 0, 2, 3)
 
         optimizer.zero_grad()
 
-        swin3d_features = swin3d(images)
+        swin3d_features = swin3d(tensor)
 
         _, density_head = model(swin3d_features, target_size)
 
-        loss = loss_fn(density_head, density_maps)
+        loss = loss_fn(density_head, tensor)
         loss.backward()
 
         optimizer.step()
@@ -87,15 +91,18 @@ for epoch in range(EPOCHS):
     # Disable gradient computation and reduce memory consumption.
     with torch.no_grad():
         for i, data in enumerate(validation_loader):
-            images, density_maps = data
+
+            # create 5D tensor
+            tensor = torch.stack(data, dim=0)
+            tensor = tensor.permute(1, 0, 2, 3)
 
             optimizer.zero_grad()
 
-            swin3d_features = swin3d(images)
+            swin3d_features = swin3d(tensor)
 
             _, density_head = model(swin3d_features, target_size)
 
-            vloss = loss_fn(density_head, density_maps)
+            vloss = loss_fn(density_head, tensor)
             running_vloss += vloss
 
     avg_vloss = running_vloss / (len(validation_loader) + 1)

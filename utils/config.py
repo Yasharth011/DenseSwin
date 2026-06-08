@@ -8,16 +8,12 @@ class DatasetConfig:
 
     videos: str = field(init=False)
     frames: str = field(init=False)
-    annotated_frames: str = field(init=False)
-    csv_dir: str = field(init=False)
-    main_csv: str = field(init=False)
+    csv: str = field(init=False)
 
     def __post_init__(self):
         self.videos = os.path.join(self.parent_path, "videos")
         self.frames = os.path.join(self.parent_path, "frames")
-        self.annotated_frames = os.path.join(self.parent_path, "annotated_frames")
-        self.csv_dir = os.path.join(self.parent_path, "csv")
-        self.main_csv = os.path.join(self.parent_path, "main.csv")
+        self.csv = os.path.join(self.parent_path, "traffic_video.csv")
 
 
 @dataclass

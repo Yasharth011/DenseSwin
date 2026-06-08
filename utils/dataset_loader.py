@@ -1,6 +1,7 @@
 from PIL import Image
 import pandas as pd
 import torch
+import json
 from torch.utils.data import Dataset
 from torchvision.tv_tensors import BoundingBoxes
 import os
@@ -12,14 +13,10 @@ from decord import VideoReader, cpu
 class TrafficDensityDataset(Dataset):
     """Traffic Dataset for Density Estimation"""
 
-    def __init__(
-        self, csv_file, video_dir, csv_dir, transform=None, tensor_transform=None
-    ):
-        self.csv = pd.read_csv(csv_file, header=None)
-        self.video_dir = video_dir
-        self.csv_dir = csv_dir
+    def __init__(self, csv_path, root_dir, transform=None):
+        self.csv = pd.read_csv(csv_path, header=None)
+        self.root_dir = root_dir
         self.transform = transform
-        self.tensor_transform = tensor_transform
 
     def __len__(self):
         return len(self.csv)
@@ -29,21 +26,20 @@ class TrafficDensityDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        video_name, csv_name = self.csv.iloc[idx]
-        video_path = os.path.join(self.video_dir, video_name)
-        csv_path = os.path.join(self.csv_dir, csv_name)
-        df = pd.read_csv(csv_path, header=None, index_col=0)
+        file_name, frames_batch, bboxes = self.csv.iloc[idx]
+        frames_batch, bboxes = json.loads(frames_batch), json.loads(bboxes)
 
-        vr = VideoReader(video_path, ctx=cpu(0))
-
+        vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
+        frames = vr.get_batch(frames_batch)
         frame_list = []
 
-        for i, data in df.iterrows():
+        for frame, bbox in frames, bboxes:
 
-            frame = Image.fromarray(vr[i].asnumpy())
+            frame = Image.fromarray(frame)
 
             if self.transform:
-                bbox = data.dropna().values.astype("float").reshape(-1, 4)
+                bbox = np.array(bbox).reshape(-1, 4)
+                bbox = torch.from_numpy(bbox).to(dtype=torch.float32)
                 bbox = BoundingBoxes(
                     bbox, format="XYWH", canvas_size=(frame.height, frame.width)
                 )

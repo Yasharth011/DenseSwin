@@ -10,22 +10,19 @@ transform = v2.Compose(
     [
         v2.Resize(target_size),
         ToDensityMap(),
-        v2.ToImage(),
-        v2.ToDtype(torch.float32, scale=True),
+        v2.ToTensor(),
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
 )
 
 training_set = TrafficDensityDataset(
-    TRAIN_DATASET.main_csv,
     TRAIN_DATASET.videos,
-    TRAIN_DATASET.csv_dir,
+    TRAIN_DATASET.csv,
     transform=transform,
 )
 validation_set = TrafficDensityDataset(
-    TEST_DATASET.main_csv,
     TEST_DATASET.videos,
-    TEST_DATASET.csv_dir,
+    TEST_DATASET.csv,
     transform=transform,
 )
 

@@ -34,6 +34,7 @@ class TrafficDensityDataset(Dataset):
         df = pd.read_csv(csv_path, header=None)
 
         vr = VideoReader(video_path, ctx=cpu(0))
+
         frame_list = []
 
         for i, data in df.iterrows():
@@ -42,7 +43,7 @@ class TrafficDensityDataset(Dataset):
 
             if self.transform:
                 bbox = data.dropna().values.astype("float").reshape(-1, 4)
-                frame = self.transform(frame, bbox)
+                frame = self.transform({"frame": frame, "bbox": bbox})
 
             frame_list.append(frame)
 
@@ -53,8 +54,8 @@ class ToDensityMap(object):
     """Convert images to density maps"""
 
     def __call__(self, sample):
-        image, bbox = sample
-        W, H = image
+        image, bbox = sample.values()
+        W, H = image.size
         density_map = np.zeros((W, H), dtype=np.float32)
 
         for x, y, w, h in bbox:

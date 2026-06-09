@@ -111,25 +111,25 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--dataset", help="create train dataset")
-    parser.add_argument("-b", "--batch", help="size of batch to process")
-    parser.add_argument("-n", "--num_frames", help="number of frames to extract")
-    parser.add_argument("-a", "--annotate", help="annotate image with bounding boxes")
-    parser.add_argument("-c", "--conf", help="confidence of yolo model")
+    parser.add_argument("-b", "--batch", help="size of batch to process", default=10)
+    parser.add_argument("-n", "--num_frames", help="number of frames to extract", default=8)
+    parser.add_argument("-a", "--annotate", help="annotate image with bounding boxes", default=False)
+    parser.add_argument("-c", "--conf", help="confidence of yolo model", default=0.15)
     args = parser.parse_args()
 
     if args.dataset == "train":
         create_dataset(
-            TRAIN_DATASET,
-            int(args.batch),
-            int(args.num_frames),
-            args.annotate,
-            args.conf,
+            dataset=TRAIN_DATASET,
+            BATCH_SIZE=int(args.batch),
+            num_frames=int(args.num_frames),
+            annotate=args.annotate,
+            CONF=args.conf,
         )
     elif args.dataset == "test":
         create_dataset(
-            TEST_DATASET,
-            int(args.batch),
-            int(args.num_frames),
-            args.annotate,
-            args.conf,
+            dataset=TEST_DATASET,
+            BATCH_SIZE=int(args.batch),
+            num_frames=int(args.num_frames),
+            annotate=args.annotate,
+            CONF=args.conf,
         )

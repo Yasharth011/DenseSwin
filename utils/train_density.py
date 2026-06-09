@@ -1,16 +1,18 @@
 from models import swin3d, DensityConv
-import torchvision.transforms as v2
+from torchvision.transforms import v2
 from torch.utils.tensorboard import SummaryWriter
-from utils import TrafficDensityDataset, ToDensityMap, TEST_DATASET, TRAIN_DATASET
+from utils import TrafficDensityDataset, TEST_DATASET, TRAIN_DATASET
 import torch
 from datetime import datetime
+
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 target_size = (224, 384)
 transform = v2.Compose(
     [
         v2.Resize(target_size),
-        ToDensityMap(),
-        v2.ToTensor(),
+        v2.ToImage(),
+        v2.ToDtype(dtype=torch.float32, scale=True),
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ]
 )
@@ -46,17 +48,18 @@ def train_one_epoch(epoch_index, tb_writer):
 
     for i, data in enumerate(training_loader):
 
-        # create 5D tensor
-        tensor = torch.stack(data, dim=0)
-        tensor = tensor.permute(1, 0, 2, 3)
+        frame, map = data 
+
+        frame = frame.to(device)
+        map = map.to(device)
 
         optimizer.zero_grad()
 
-        swin3d_features = swin3d(tensor)
+        swin3d_features = swin3d(frame)
 
         _, density_head = model(swin3d_features, target_size)
 
-        loss = loss_fn(density_head, tensor)
+        loss = loss_fn(density_head, map)
         loss.backward()
 
         optimizer.step()
@@ -94,18 +97,19 @@ for epoch in range(EPOCHS):
     # Disable gradient computation and reduce memory consumption.
     with torch.no_grad():
         for i, data in enumerate(validation_loader):
+    
+            frame, map = data
 
-            # create 5D tensor
-            tensor = torch.stack(data, dim=0)
-            tensor = tensor.permute(1, 0, 2, 3)
+            frame = frame.to(device)
+            map = map.to(device)
 
             optimizer.zero_grad()
 
-            swin3d_features = swin3d(tensor)
+            swin3d_features = swin3d(frame)
 
             _, density_head = model(swin3d_features, target_size)
 
-            vloss = loss_fn(density_head, tensor)
+            vloss = loss_fn(density_head, map)
             running_vloss += vloss
 
     avg_vloss = running_vloss / (len(validation_loader) + 1)

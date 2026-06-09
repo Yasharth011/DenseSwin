@@ -13,7 +13,7 @@ from decord import VideoReader, cpu
 class TrafficDensityDataset(Dataset):
     """Traffic Dataset for Density Estimation"""
 
-    def __init__(self, csv_path, root_dir, transform=None):
+    def __init__(self, root_dir, csv_path, transform=None):
         self.csv = pd.read_csv(csv_path, header=None)
         self.root_dir = root_dir
         self.transform = transform
@@ -21,41 +21,9 @@ class TrafficDensityDataset(Dataset):
     def __len__(self):
         return len(self.csv)
 
-    def __getitem__(self, idx):
-
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-
-        file_name, frames_batch, bboxes = self.csv.iloc[idx]
-        frames_batch, bboxes = json.loads(frames_batch), json.loads(bboxes)
-
-        vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
-        frames = vr.get_batch(frames_batch)
-        frame_list = []
-
-        for frame, bbox in frames, bboxes:
-
-            frame = Image.fromarray(frame)
-
-            if self.transform:
-                bbox = np.array(bbox).reshape(-1, 4)
-                bbox = torch.from_numpy(bbox).to(dtype=torch.float32)
-                bbox = BoundingBoxes(
-                    bbox, format="XYWH", canvas_size=(frame.height, frame.width)
-                )
-                frame = self.transform(frame, bbox)
-
-            frame_list.append(frame)
-
-        return frame_list
-
-
-class ToDensityMap(torch.nn.Module):
-    """Convert images to density maps"""
-
-    def forward(self, image, bbox):
+    def _getmap(self, image, bbox):
         W, H = image.size
-        density_map = np.zeros((W, H), dtype=np.float32)
+        density_map = np.zeros((H, W), dtype=np.float32)
 
         for x, y, w, h in bbox:
             x, y = int(x), int(y)
@@ -73,3 +41,39 @@ class ToDensityMap(torch.nn.Module):
             density_map = (density_map / density_map.sum()) * len(bbox)
 
         return density_map
+
+    def __getitem__(self, idx):
+
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        file_name, frames_batch, bboxes = self.csv.iloc[idx]
+        frames_batch, bboxes = json.loads(frames_batch), json.loads(bboxes)
+
+        vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
+
+        frames = vr.get_batch(frames_batch).asnumpy()
+        frame_list = []
+        map_list = []
+
+        for frame, bbox in zip(frames, bboxes):
+
+            frame = Image.fromarray(frame)
+
+            bbox = np.array(bbox).reshape(-1, 4)
+            bbox = torch.from_numpy(bbox).to(dtype=torch.float32)
+
+            map = self._getmap(frame, bbox)
+            map = torch.from_numpy(map).unsqueeze(0).float()
+            
+            if self.transform:
+                frame = self.transform(frame)
+                map = self.transform(map)
+
+            frame_list.append(frame)
+            map_list.append(map)
+
+        frame_list = torch.stack(frame_list, dim=0)#.permute(1, 0, 2, 3)
+        map_list = torch.stack(map_list, dim=0)#.permute(1, 0, 2, 3)
+
+        return frame_list, map_list

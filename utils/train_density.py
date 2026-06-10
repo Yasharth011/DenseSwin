@@ -1,16 +1,24 @@
 from models import swin3d, DensityConv
 from torchvision.transforms import v2
 from torch.utils.tensorboard import SummaryWriter
-from utils import TrafficDensityDataset, TEST_DATASET, TRAIN_DATASET
+from utils import TrafficDensityDataset, TEST_DATASET, TRAIN_DATASET, MODEL_CONFIG
 import torch
+import os
 from datetime import datetime
+import argparse
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
-target_size = (224, 384)
+parser = argparse.ArgumentParser()
+parser.add_argument("-e", "--epochs", help="number of epoch", default=1)
+args = parser.parse_args()
+
+EPOCHS = args.epochs
+TARGET_SIZE = (224, 384)
+
 transform = v2.Compose(
     [
-        v2.Resize(target_size),
+        v2.Resize(TARGET_SIZE),
         v2.ToImage(),
         v2.ToDtype(dtype=torch.float32, scale=True),
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -43,12 +51,13 @@ optimizer = torch.optim.AdamW(
 
 
 def train_one_epoch(epoch_index, tb_writer):
+
     running_loss = 0
     last_loss = 0
 
     for i, data in enumerate(training_loader):
-
-        frame, map = data 
+        breakpoint()
+        frame, map = data
 
         frame = frame.to(device)
         map = map.to(device)
@@ -57,7 +66,7 @@ def train_one_epoch(epoch_index, tb_writer):
 
         swin3d_features = swin3d(frame)
 
-        _, density_head = model(swin3d_features, target_size)
+        _, density_head = model(swin3d_features, TARGET_SIZE)
 
         loss = loss_fn(density_head, map)
         loss.backward()
@@ -76,10 +85,11 @@ def train_one_epoch(epoch_index, tb_writer):
 
 
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-writer = SummaryWriter("runs/density_module_trainer{}".format(timestamp))
-epoch_number = 0
+writer = SummaryWriter(
+    os.path.join(MODEL_CONFIG.logs, f"density_module_trainer{timestamp}")
+)
 
-EPOCHS = 5
+epoch_number = 0
 
 best_vloss = 1_000_000.0
 
@@ -97,7 +107,7 @@ for epoch in range(EPOCHS):
     # Disable gradient computation and reduce memory consumption.
     with torch.no_grad():
         for i, data in enumerate(validation_loader):
-    
+
             frame, map = data
 
             frame = frame.to(device)
@@ -107,7 +117,7 @@ for epoch in range(EPOCHS):
 
             swin3d_features = swin3d(frame)
 
-            _, density_head = model(swin3d_features, target_size)
+            _, density_head = model(swin3d_features, TARGET_SIZE)
 
             vloss = loss_fn(density_head, map)
             running_vloss += vloss
@@ -127,7 +137,10 @@ for epoch in range(EPOCHS):
         best_vloss = avg_vloss
         model_path = "model_{}_{}".format(timestamp, epoch_number)
         torch.save(
-            model.state_dict(), f"../checkpoints/density_module_{epoch_number}.pth"
+            model.state_dict(),
+            os.path.join(
+                MODEL_CONFIG.checkpoints, f"density_module_{epoch_number}.pth"
+            ),
         )
 
     epoch_number += 1

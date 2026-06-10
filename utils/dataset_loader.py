@@ -73,7 +73,7 @@ class TrafficDensityDataset(Dataset):
             frame_list.append(frame)
             map_list.append(map)
 
-        frame_list = torch.stack(frame_list, dim=0)#.permute(1, 0, 2, 3)
-        map_list = torch.stack(map_list, dim=0)#.permute(1, 0, 2, 3)
+        frame_list = torch.stack(frame_list, dim=0).permute(1, 0, 2, 3)
+        map_list = torch.stack(map_list, dim=0).permute(1, 0, 2, 3)
 
         return frame_list, map_list

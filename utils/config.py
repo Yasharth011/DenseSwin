@@ -30,4 +30,4 @@ class ModelConfig:
 
 TRAIN_DATASET = DatasetConfig("dataset/train")
 TEST_DATASET = DatasetConfig("dataset/test")
-MODEL_CONFIG = ModelConfig("model")
+MODEL_CONFIG = ModelConfig("")

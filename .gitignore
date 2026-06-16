@@ -6,3 +6,5 @@ dataset
 docs
 *.egg-info
 *.pt
+logs 
+runs

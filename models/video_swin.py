@@ -1,6 +1,5 @@
 """ Credits to pytorch Video Swin Transformer Implementation : https://github.com/pytorch/vision/blob/main/torchvision/models/video/swin_transformer.py """
 
-from torch.cuda import is_available
 import torch.nn as nn
 import torch
 from torch import Tensor
@@ -27,7 +26,6 @@ class VideoSwinT(nn.Module):
         dropout (float): Dropout rate. Default: 0.0.
         attention_dropout (float): Attention dropout rate. Default: 0.0.
         stochastic_depth_prob (float): Stochastic depth rate. Default: 0.1.
-        num_classes (int): Number of classes for classification head. Default: 400.
         norm_layer (nn.Module, optional): Normalization layer. Default: None.
         block (nn.Module, optional): SwinTransformer Block. Default: None.
         downsample_layer (nn.Module): Downsample layer (patch merging). Default: PatchMerging.
@@ -45,14 +43,12 @@ class VideoSwinT(nn.Module):
         dropout: float = 0.0,
         attention_dropout: float = 0.0,
         stochastic_depth_prob: float = 0.1,
-        num_classes: int = 400,
         norm_layer: Optional[Callable[..., nn.Module]] = None,
         block: Optional[Callable[..., nn.Module]] = None,
         downsample_layer: Callable[..., nn.Module] = PatchMerging,
         patch_embed: Optional[Callable[..., nn.Module]] = None,
     ) -> None:
         super().__init__()
-        self.num_classes = num_classes
 
         if block is None:
             block = partial(SwinTransformerBlock, attn_layer=ShiftedWindowAttention3d)
@@ -137,4 +133,3 @@ model.load_state_dict(weights.get_state_dict(progress=True), strict=False)
 swin3d = model.eval()
 if torch.cuda.is_available():
     swin3d = swin3d.cuda()
-

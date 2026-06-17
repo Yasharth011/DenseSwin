@@ -57,7 +57,7 @@ def train_one_epoch(epoch_index, tb_writer):
 
     for i, data in enumerate(training_loader):
         breakpoint()
-        frame, map = data
+        frame, conD, map = data
 
         frame = frame.to(device)
         map = map.to(device)

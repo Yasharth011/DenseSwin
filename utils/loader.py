@@ -3,7 +3,6 @@ import pandas as pd
 import torch
 import json
 from torch.utils.data import Dataset
-from torchvision.tv_tensors import BoundingBoxes
 import os
 from scipy.ndimage import gaussian_filter
 import numpy as np
@@ -14,7 +13,7 @@ class TrafficDensityDataset(Dataset):
     """Traffic Dataset for Density Estimation"""
 
     def __init__(self, root_dir, csv_path, transform=None):
-        self.csv = pd.read_csv(csv_path, header=None)
+        self.csv = pd.read_csv(csv_path, header=0)
         self.root_dir = root_dir
         self.transform = transform
 
@@ -47,8 +46,11 @@ class TrafficDensityDataset(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        file_name, frames_batch, bboxes = self.csv.iloc[idx]
-        frames_batch, bboxes = json.loads(frames_batch), json.loads(bboxes)
+        file_name, frames_batch, conD, bboxes = self.csv.iloc[idx]
+        frames_batch, bboxes = (
+            json.loads(frames_batch),
+            json.loads(bboxes),
+        )
 
         vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
 
@@ -65,7 +67,7 @@ class TrafficDensityDataset(Dataset):
 
             map = self._getmap(frame, bbox)
             map = torch.from_numpy(map).unsqueeze(0).float()
-            
+
             if self.transform:
                 frame = self.transform(frame)
                 map = self.transform(map)
@@ -76,4 +78,4 @@ class TrafficDensityDataset(Dataset):
         frame_list = torch.stack(frame_list, dim=0).permute(1, 0, 2, 3)
         map_list = torch.stack(map_list, dim=0).permute(1, 0, 2, 3)
 
-        return frame_list, map_list
+        return (frame_list, conD, map_list)

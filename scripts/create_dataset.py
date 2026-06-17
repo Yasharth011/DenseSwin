@@ -102,14 +102,14 @@ def create_dataset(dataset, BATCH_SIZE=10, num_frames=8, annotate=False, CONF=0.
     video_path = dataset.videos
     video_len = len(os.listdir(video_path))
     csv_path = dataset.csv
-    headers = ["file name", "frames batch", "conD", "bounding boxes"]
+    headers = False
     i = 1
     dataset_rows = []
 
     processed_videos = set()
     try:
         df = pd.read_csv(csv_path, header=0)
-        processed_videos = set(df[0].to_list())
+        processed_videos = set(df['file_name'].to_list())
 
         if len(processed_videos) == video_len:
             print("Processed all videos already")
@@ -121,7 +121,8 @@ def create_dataset(dataset, BATCH_SIZE=10, num_frames=8, annotate=False, CONF=0.
         video_len = video_len - len(processed_videos)
 
     except Exception as e:
-        print(f"{e}")
+        headers = ["file_name", "frames_batch", "conD", "bounding_boxes"]
+        print(f"Pandas: {e}")
 
     for file in os.scandir(dataset.videos):
 

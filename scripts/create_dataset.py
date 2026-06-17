@@ -108,7 +108,7 @@ def create_dataset(dataset, BATCH_SIZE=10, num_frames=8, annotate=False, CONF=0.
 
     processed_videos = set()
     try:
-        df = pd.read_csv(csv_path, header=None)
+        df = pd.read_csv(csv_path, header=0)
         processed_videos = set(df[0].to_list())
 
         if len(processed_videos) == video_len:

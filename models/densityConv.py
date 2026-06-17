@@ -22,7 +22,7 @@ class DensityConv(nn.Module):
 
     def forward(self, swin3d_features, target_size):
         h, w = target_size
-        B, T, H, W, C = swin3d_features.shape
+        B, C, T, H, W = swin3d_features.shape
         swin3d_features = swin3d_features.permute(0, 2, 1, 3, 4)
         flattened_batch = swin3d_features.reshape(B * T, C, H, W)
         features = self.conv_blocks(flattened_batch)

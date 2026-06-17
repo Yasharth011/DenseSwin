@@ -112,7 +112,7 @@ def create_dataset(dataset, BATCH_SIZE=10, num_frames=8, annotate=False, CONF=0.
         processed_videos = set(df['file_name'].to_list())
 
         if len(processed_videos) == video_len:
-            print("Processed all videos already")
+            print("Processed all videos")
             exit()
 
         print(

@@ -121,7 +121,7 @@ def create_dataset(dataset, BATCH_SIZE=10, num_frames=8, annotate=False, CONF=0.
         video_len = video_len - len(processed_videos)
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"{e}")
 
     for file in os.scandir(dataset.videos):
 

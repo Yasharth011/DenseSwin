@@ -1,4 +1,4 @@
-from .densityConv import DensityConv
-from .vSwinE import swin3d
+from .densityConv import densityConv
+from .vSwinT import vSwinE, vSwinD
 
-__all__ = ["swin3d", "DensityConv"]
+__all__ = ["vSwinE", "vSwinD", "densityConv"]

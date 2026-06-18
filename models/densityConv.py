@@ -11,7 +11,7 @@ def conv_bn_reul(in_ch, out_ch):
     )
 
 
-class DensityConv(nn.Module):
+class densityConv(nn.Module):
     def __init__(self, in_ch: int = 768):
         super().__init__()
         self.conv_blocks = nn.Sequential(

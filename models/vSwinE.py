@@ -11,9 +11,37 @@ from torchvision.models.video.swin_transformer import (
     Swin3D_T_Weights
 )
 from functools import partial
+from einops import rearrange  
 
 
-class VideoSwinT(nn.Module):
+class PatchExpand(nn.Module):
+    def __init__(self, input_resolution: list[int], dim, dim_scale=2, norm_layer=nn.LayerNorm):
+        super().__init__()
+        self.input_resolution = input_resolution
+        self.dim = dim
+        self.expand = nn.Linear(dim, 2 * dim, bias=False) if dim_scale == 2 else nn.Identity()
+        self.norm = norm_layer(dim // dim_scale)
+
+    def forward(self, x):
+        """
+        x: B, C, T, H, W
+        """
+        x=x.permute(0 , 2, 3, 4, 1 )# B _T _H _W C
+        #H, W = self.input_resolution
+        
+        x = self.expand(x)
+        _, _, _, _, C = x.shape
+    
+        #x = x.view(B, T, H, W, C)
+        x = rearrange(x, 'b t h w (p1 p2 c)-> b t (h p1) (w p2) c', p1=2, p2=2, c=C // 4)
+
+        x = self.norm(x)
+
+        x=x.permute(0 , 4, 1, 2, 3 )
+        return x
+
+
+class VideoSwinE(nn.Module):
     """
     Implements 3D Swin Transformer from the `"Video Swin Transformer" <https://arxiv.org/abs/2106.13230>`_ paper.
     Args:
@@ -119,7 +147,103 @@ class VideoSwinT(nn.Module):
         x = x.permute(0, 4, 1, 2, 3)  # B, C, _T, _H, _W
         return x
 
-model = VideoSwinT(
+
+class VideoSwinD(nn.Module):
+    """
+    Implements 3D Swin Decoder from the `"Video Swin Transformer" <https://arxiv.org/abs/2106.13230>`_ paper.
+    Args:
+        patch_size (List[int]): Patch size.
+        embed_dim (int): Patch embedding dimension.
+        depths (List(int)): Depth of each Swin Transformer layer.
+        num_heads (List(int)): Number of attention heads in different layers.
+        window_size (List[int]): Window size.
+        mlp_ratio (float): Ratio of mlp hidden dim to embedding dim. Default: 4.0.
+        dropout (float): Dropout rate. Default: 0.0.
+        attention_dropout (float): Attention dropout rate. Default: 0.0.
+        stochastic_depth_prob (float): Stochastic depth rate. Default: 0.1.
+        norm_layer (nn.Module, optional): Normalization layer. Default: None.
+        block (nn.Module, optional): SwinTransformer Block. Default: None.
+        upsample (nn.Module): Upsample layer (patch expansion). Default: PatchExpansion.
+    """
+
+    def __init__(
+        self,
+        embed_dim: int,
+        depths: list[int],
+        num_heads: list[int],
+        window_size: list[int],
+        mlp_ratio: float = 4.0,
+        dropout: float = 0.0,
+        attention_dropout: float = 0.0,
+        stochastic_depth_prob: float = 0.1,
+        norm_layer: Optional[Callable[..., nn.Module]] = None,
+        block: Optional[Callable[..., nn.Module]] = None,
+        upsample_layer: Callable[...,nn.Module] = PatchExpand,
+    ) -> None:
+        super().__init__()
+
+        if block is None:
+            block = partial(SwinTransformerBlock, attn_layer=ShiftedWindowAttention3d)
+
+        if norm_layer is None:
+            norm_layer = partial(nn.LayerNorm, eps=1e-5)
+
+        self.pos_drop = nn.Dropout(p=dropout)#to randomly drop 
+
+        layers: list[nn.Module] = []
+        total_stage_blocks = sum(depths)
+        stage_block_id = 0
+        # build SwinTransformer blocks
+        for i_stage in range(len(depths)):
+            stage: list[nn.Module] = []
+            dim = embed_dim // 2**i_stage
+            for i_layer in range(depths[i_stage]):
+                # adjust stochastic depth probability based on the depth of the stage block
+                sd_prob = (
+                    stochastic_depth_prob
+                    * float(stage_block_id)
+                    / (total_stage_blocks - 1)
+                )
+                stage.append(
+                    block(
+                        dim,
+                        num_heads[i_stage],
+                        window_size=window_size,
+                        shift_size=[
+                            0 if i_layer % 2 == 0 else w // 2 for w in window_size
+                        ],
+                        mlp_ratio=mlp_ratio,
+                        dropout=dropout,
+                        attention_dropout=attention_dropout,
+                        stochastic_depth_prob=sd_prob,
+                        norm_layer=norm_layer,
+                        attn_layer=ShiftedWindowAttention3d,
+                    )
+                )
+                stage_block_id += 1
+            layers.append(nn.Sequential(*stage))
+            # add patch expansion layer
+            if i_stage < (len(depths) - 1):
+                layers.append(upsample_layer(window_size ,dim , dim_scale = 2 , norm_layer=norm_layer))
+        self.features = nn.Sequential(*layers)
+
+        self.num_features = embed_dim // 2 ** (len(depths) - 1)
+        self.norm = norm_layer(self.num_features)
+
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.trunc_normal_(m.weight, std=0.02)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: B C T H W
+        x = self.pos_drop(x)
+        x = self.features(x)  # B _T _H _W C
+        x = x.permute(0, 4, 1, 2, 3)  # B, C, _T, _H, _W
+        return x
+
+encoder = VideoSwinE(
         patch_size=[2, 4, 4],      
         embed_dim=96,               
         depths=[2, 2, 6, 2],      
@@ -127,9 +251,24 @@ model = VideoSwinT(
         window_size=[8, 7, 7],   
         stochastic_depth_prob=0.2   
 )
-weights = Swin3D_T_Weights.DEFAULT
-model.load_state_dict(weights.get_state_dict(progress=True), strict=False)
 
-swin3d = model.eval()
+decoder = VideoSwinD(
+        embed_dim=768,                  
+        depths=[2, 6, 2, 2],      
+        num_heads=[24 ,12, 6, 3],   
+        window_size=[8, 7, 7],   
+        stochastic_depth_prob=0.2   
+)
+
+weights = Swin3D_T_Weights.DEFAULT
+
+encoder.load_state_dict(weights.get_state_dict(progress=True), strict=False)
+
+decoder.load_state_dict(weights.get_state_dict(progress=True), strict=False)
+
+vSwinE = encoder.eval()
+vSwinD = decoder.eval() 
+
 if torch.cuda.is_available():
-    swin3d = swin3d.cuda()
+    vSwinE = vSwinE.cuda()
+    vSwinD = vSwinD.cuda()

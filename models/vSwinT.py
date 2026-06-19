@@ -23,21 +23,14 @@ class PatchExpand(nn.Module):
         self.norm = norm_layer(dim // dim_scale)
 
     def forward(self, x):
-        """
-        x: B, C, T, H, W
-        """
-        x=x.permute(0 , 2, 3, 4, 1 )# B _T _H _W C
-        #H, W = self.input_resolution
-        
+        # x: B, T, H, W, C
         x = self.expand(x)
         _, _, _, _, C = x.shape
     
-        #x = x.view(B, T, H, W, C)
         x = rearrange(x, 'b t h w (p1 p2 c)-> b t (h p1) (w p2) c', p1=2, p2=2, c=C // 4)
 
         x = self.norm(x)
 
-        x=x.permute(0 , 4, 1, 2, 3 )
         return x
 
 
@@ -239,6 +232,7 @@ class VideoSwinD(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         # x: B C T H W
         x = self.pos_drop(x)
+        x = x.permute(0, 2, 3, 4, 1) # B T H W C
         x = self.features(x)  # B _T _H _W C
         x = x.permute(0, 4, 1, 2, 3)  # B, C, _T, _H, _W
         return x
@@ -264,11 +258,9 @@ weights = Swin3D_T_Weights.DEFAULT
 
 encoder.load_state_dict(weights.get_state_dict(progress=True), strict=False)
 
-decoder.load_state_dict(weights.get_state_dict(progress=True), strict=False)
-
 vSwinE = encoder.eval()
 vSwinD = decoder.eval() 
 
 if torch.cuda.is_available():
-    vSwinE = vSwinE.cuda()
-    vSwinD = vSwinD.cuda()
+   vSwinE = vSwinE.cuda()
+   vSwinD = vSwinD.cuda()

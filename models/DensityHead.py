@@ -48,7 +48,7 @@ class SpatialPoolPyramid(nn.Module):
         return self.relu(bottle)
 
 
-class densityConv(nn.Module):
+class DensityHead(nn.Module):
     """
     Implements a Dilated CNNs with Spatial Pyramid Pooling to create density feature map
     Args : 

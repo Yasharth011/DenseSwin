@@ -1,4 +1,5 @@
 from .DensityHead import DensityHead
-from .vSwinT import vSwinE, vSwinD
+from .vSwinT import VideoSwinE, VideoSwinD
+from .DenseSwin import DenseSwin
 
-__all__ = ["vSwinE", "vSwinD", "densityConv"]
+__all__ = ["VideoSwinE", "VideoSwinD", "DensityHead", "DenseSwin"]

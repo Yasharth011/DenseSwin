@@ -1,7 +1,6 @@
 """ Credits to pytorch Video Swin Transformer Implementation : https://github.com/pytorch/vision/blob/main/torchvision/models/video/swin_transformer.py """
 
 import torch.nn as nn
-import torch
 from torch import Tensor
 from typing import Callable, Optional
 from torchvision.models.swin_transformer import PatchMerging, SwinTransformerBlock
@@ -236,31 +235,3 @@ class VideoSwinD(nn.Module):
         x = self.features(x)  # B _T _H _W C
         x = x.permute(0, 4, 1, 2, 3)  # B, C, _T, _H, _W
         return x
-
-encoder = VideoSwinE(
-        patch_size=[2, 4, 4],      
-        embed_dim=96,               
-        depths=[2, 2, 6, 2],      
-        num_heads=[3, 6, 12, 24],   
-        window_size=[8, 7, 7],   
-        stochastic_depth_prob=0.2   
-)
-
-decoder = VideoSwinD(
-        embed_dim=768,                  
-        depths=[2, 6, 2, 2],      
-        num_heads=[24 ,12, 6, 3],   
-        window_size=[8, 7, 7],   
-        stochastic_depth_prob=0.2   
-)
-
-weights = Swin3D_T_Weights.DEFAULT
-
-encoder.load_state_dict(weights.get_state_dict(progress=True), strict=False)
-
-vSwinE = encoder.eval()
-vSwinD = decoder.eval() 
-
-if torch.cuda.is_available():
-   vSwinE = vSwinE.cuda()
-   vSwinD = vSwinD.cuda()

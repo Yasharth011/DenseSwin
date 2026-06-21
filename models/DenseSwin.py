@@ -19,7 +19,7 @@ class DenseSwin(nn.Module):
 
     def __init__(
         self,
-        linear_ch: int,
+        linear_ch: int = 96,
         backbone: Optional[nn.Module] = None,
         density_head: Optional[nn.Module] = None,
         neck: Optional[nn.Module] = None,

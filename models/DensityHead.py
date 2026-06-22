@@ -67,7 +67,7 @@ class DensityHead(nn.Module):
     """
     Implements a Dilated CNNs with Spatial Pyramid Pooling to create density feature map
     Args :
-        size (Tuple[int,int]): target size (H, W) of density feature map
+        size (Tuple[int,int]): target size (T, H, W) of density feature map
         ch_dims (List[int]): list of channel size for each layer
         layer (nn.Module, optional): Dilated Conv Block Default: None.
         pooling layer (nn.Module, optional): Spatial Pooling Layer Default: None.
@@ -75,7 +75,7 @@ class DensityHead(nn.Module):
 
     def __init__(
         self,
-        size: tuple[int, int],
+        size: tuple[int, int, int],
         ch_dims: list[int],
         layer: Optional[Callable[..., nn.Module]] = None,
         pooling_layer: Optional[nn.Module] = None,
@@ -116,9 +116,8 @@ class DensityHead(nn.Module):
         F_dm: Tensor = self.conv_block(x)
         F_dm = self.pooling_layer(F_dm)
 
-        T, H, W = F_dm.size(2), self.size[0], self.size[1]
         interpolated_features = F.interpolate(
-            F_dm, size=(T, H, W), mode="trilinear", align_corners=False
+            F_dm, size=self.size, mode="trilinear", align_corners=False
         )
 
         D = self.density_head(interpolated_features)

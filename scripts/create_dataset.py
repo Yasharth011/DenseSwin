@@ -78,6 +78,9 @@ def get_conD(bboxes, roi_area=224 * 384, max_expected_cars=30):
         sequence_conD_sum += (a * conS_list[t]) / (b + velocity_list[t])
 
     conD = sequence_conD_sum / (num_frames - 1)
+
+    conD = conD/4 # norm the value between 0 to 1
+
     return float(conD)
 
 

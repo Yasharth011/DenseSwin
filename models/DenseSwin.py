@@ -42,7 +42,7 @@ class DenseSwin(nn.Module):
             self.backbone = backbone
 
         if density_head is None:
-            self.density_head = DensityHead((224, 384), [768, 512, 256])
+            self.density_head = DensityHead((8, 224, 384), [768, 512, 256])
         else:
             self.density_head = density_head
 
@@ -72,6 +72,6 @@ class DenseSwin(nn.Module):
 
         x = torch.flatten(x, 1)
 
-        x = self.head(x)
+        x = self.head(x).squeeze(0)
 
         return x, D

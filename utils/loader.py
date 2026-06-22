@@ -7,6 +7,7 @@ import os
 from scipy.ndimage import gaussian_filter
 import numpy as np
 from decord import VideoReader, cpu
+from torchvision import tv_tensors
 
 
 class TrafficDensityDataset(Dataset):
@@ -20,8 +21,8 @@ class TrafficDensityDataset(Dataset):
     def __len__(self):
         return len(self.csv)
 
-    def _getmap(self, image, bbox):
-        W, H = image.size
+    def _getmap(self, size, bbox):
+        H, W = size
         density_map = np.zeros((H, W), dtype=np.float32)
 
         for x, y, w, h in bbox:
@@ -61,16 +62,23 @@ class TrafficDensityDataset(Dataset):
         for frame, bbox in zip(frames, bboxes):
 
             frame = Image.fromarray(frame)
+            H, W = frame.size
 
             bbox = np.array(bbox).reshape(-1, 4)
-            bbox = torch.from_numpy(bbox).to(dtype=torch.float32)
-
-            map = self._getmap(frame, bbox)
-            map = torch.from_numpy(map).unsqueeze(0).float()
+            tv_bbox = tv_tensors.BoundingBoxes(
+                data=bbox,
+                format=tv_tensors.BoundingBoxFormat.CXCYWH,
+                canvas_size=(H, W),
+            )
 
             if self.transform:
-                frame = self.transform(frame)
-                map = self.transform(map)
+                frame, tv_bbox = self.transform(frame, tv_bbox)
+                H, W = frame.shape[-2:]
+
+            map = self._getmap((H, W), tv_bbox.cpu().numpy())
+            map = (
+                torch.from_numpy(map).unsqueeze(0).float()
+            )
 
             frame_list.append(frame)
             map_list.append(map)

@@ -1,4 +1,4 @@
-from models import swin3d, DensityConv
+from models import DenseSwin
 from torchvision.transforms import v2
 from torch.utils.tensorboard import SummaryWriter
 from utils import TrafficDensityDataset, TEST_DATASET, TRAIN_DATASET, MODEL_CONFIG
@@ -15,6 +15,8 @@ args = parser.parse_args()
 
 EPOCHS = args.epochs
 TARGET_SIZE = (224, 384)
+W_DS = 1.0
+W_D = 0.25
 
 transform = v2.Compose(
     [
@@ -41,13 +43,18 @@ validation_loader = torch.utils.data.DataLoader(
     validation_set, batch_size=4, shuffle=False
 )
 
-model = DensityConv()
+model = DenseSwin().to(device)
 
-loss_fn = torch.nn.MSELoss()
+D_loss = torch.nn.MSELoss()
+DS_loss = torch.nn.SmoothL1Loss()
 
-optimizer = torch.optim.AdamW(
-    [{"params": model.parameters(), "lr": 1e-5}], weight_decay=1e-4
-)
+params = [
+    {"params": model.backbone.parameters(), "lr": 1e-5},
+    {"params": model.density_head.parameters(), "lr": 1e-4},
+    {"params": model.neck.parameters(), "lr": 1e-4},
+    {"params": model.head.parameters(), "lr": 1e-4},
+]
+optimizer = torch.optim.AdamW(params, weight_decay=0.05)
 
 
 def train_one_epoch(epoch_index, tb_writer):
@@ -56,19 +63,15 @@ def train_one_epoch(epoch_index, tb_writer):
     last_loss = 0
 
     for i, data in enumerate(training_loader):
-        breakpoint()
-        frame, conD, map = data
 
-        frame = frame.to(device)
-        map = map.to(device)
+        frame, conD, map = [x.to(device) for x in data]
 
         optimizer.zero_grad()
 
-        swin3d_features = swin3d(frame)
+        F_ds, D = model(frame)
 
-        _, density_head = model(swin3d_features, TARGET_SIZE)
+        loss = (W_DS * DS_loss(F_ds, conD)) + (W_D * D_loss(D, map))
 
-        loss = loss_fn(density_head, map)
         loss.backward()
 
         optimizer.step()
@@ -108,18 +111,13 @@ for epoch in range(EPOCHS):
     with torch.no_grad():
         for i, data in enumerate(validation_loader):
 
-            frame, map = data
-
-            frame = frame.to(device)
-            map = map.to(device)
+            frame, conD, map = [x.to(device) for x in data]
 
             optimizer.zero_grad()
 
-            swin3d_features = swin3d(frame)
+            F_ds, D = model(frame)
 
-            _, density_head = model(swin3d_features, TARGET_SIZE)
-
-            vloss = loss_fn(density_head, map)
+            vloss = (W_DS * DS_loss(F_ds, conD)) + (W_D * D_loss(D, map))
             running_vloss += vloss
 
     avg_vloss = running_vloss / (len(validation_loader) + 1)

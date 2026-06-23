@@ -8,3 +8,4 @@ docs
 *.pt
 logs 
 runs
+build

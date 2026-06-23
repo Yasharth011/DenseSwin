@@ -38,9 +38,9 @@ validation_set = TrafficDensityDataset(
     transform=transform,
 )
 
-training_loader = torch.utils.data.DataLoader(training_set, batch_size=4, shuffle=True)
+training_loader = torch.utils.data.DataLoader(training_set, batch_size=1, shuffle=True)
 validation_loader = torch.utils.data.DataLoader(
-    validation_set, batch_size=4, shuffle=False
+    validation_set, batch_size=1, shuffle=False
 )
 
 model = DenseSwin().to(device)
@@ -87,7 +87,7 @@ def train_one_epoch(epoch_index, tb_writer):
     return last_loss
 
 
-timestamp = datetime.now().strftime("%Y/%m/%d_%H:%M:%S")
+timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 writer = SummaryWriter(
     os.path.join(MODEL_CONFIG.logs, f"density_module_trainer{timestamp}")
 )

@@ -110,7 +110,7 @@ for epoch in range(EPOCHS):
 
             running_loss += loss.item()
 
-            tepoch.set_postfix(loss=running_loss)
+            tepoch.set_postfix(loss=loss.item())
 
             if i % 100 == 99:
                 batch_avg_loss = running_loss / 100  # loss per batch
@@ -147,7 +147,7 @@ for epoch in range(EPOCHS):
 
                 running_vloss += vloss
 
-                tepoch.set_postfix(loss=vloss.item)
+                tepoch.set_postfix(loss=vloss.item())
 
             avg_vloss = running_vloss / len(validation_loader)
 

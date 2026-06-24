@@ -1,7 +1,14 @@
 from models import DenseSwin
 from torchvision.transforms import v2
 from torch.utils.tensorboard import SummaryWriter
-from utils import TrafficDensityDataset, TEST_DATASET, TRAIN_DATASET, MODEL_CONFIG, EarlyStopper, early_stopper
+from utils import (
+    TrafficDensityDataset,
+    TEST_DATASET,
+    TRAIN_DATASET,
+    MODEL_CONFIG,
+    EarlyStopper,
+    early_stopper,
+)
 import torch
 import os
 from datetime import datetime
@@ -44,9 +51,11 @@ validation_set = TrafficDensityDataset(
     transform=transform,
 )
 
-training_loader = torch.utils.data.DataLoader(training_set, batch_size=1, shuffle=True)
+training_loader = torch.utils.data.DataLoader(
+    training_set, batch_size=1, shuffle=True, num_workers=4, pin_memory=True
+)
 validation_loader = torch.utils.data.DataLoader(
-    validation_set, batch_size=1, shuffle=False
+    validation_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True
 )
 
 model = DenseSwin().to(device)
@@ -81,7 +90,7 @@ for epoch in range(EPOCHS):
 
     with tqdm(training_loader) as tepoch:
 
-        tepoch.set_description(f"Training Epoch {epoch}")
+        tepoch.set_description(f"Training Epoch {epoch+1}")
         running_loss = 0
         total_loss = 0
 
@@ -101,7 +110,7 @@ for epoch in range(EPOCHS):
 
             running_loss += loss.item()
 
-            tepoch.set_postfix(loss=loss.item)
+            tepoch.set_postfix(loss=running_loss)
 
             if i % 100 == 99:
                 batch_avg_loss = running_loss / 100  # loss per batch
@@ -123,7 +132,7 @@ for epoch in range(EPOCHS):
 
         with tqdm(training_loader) as tepoch:
 
-            tepoch.set_description(f"Training Epoch {epoch}")
+            tepoch.set_description(f"Training Epoch {epoch+1}")
             running_vloss = 0.0
 
             for i, data in enumerate(tepoch):
@@ -154,12 +163,10 @@ for epoch in range(EPOCHS):
     # Track best performance, and save the model's state
     if avg_vloss < best_vloss:
         best_vloss = avg_vloss
-        model_path = "model_{}_{}".format(timestamp, epoch+1)
+        model_path = "model_{}_{}".format(timestamp, epoch + 1)
         torch.save(
             model.state_dict(),
-            os.path.join(
-                MODEL_CONFIG.checkpoints, f"density_module_{epoch+1}.pth"
-            ),
+            os.path.join(MODEL_CONFIG.checkpoints, f"density_module_{epoch+1}.pth"),
         )
 
     # Check for early stop

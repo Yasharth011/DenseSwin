@@ -1,26 +1,32 @@
 from models import DenseSwin
 from torchvision.transforms import v2
 from torch.utils.tensorboard import SummaryWriter
-from utils import TrafficDensityDataset, TEST_DATASET, TRAIN_DATASET, MODEL_CONFIG
+from utils import TrafficDensityDataset, TEST_DATASET, TRAIN_DATASET, MODEL_CONFIG, EarlyStopper, early_stopper
 import torch
 import os
 from datetime import datetime
 import argparse
+from tqdm import tqdm
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-e", "--epochs", help="number of epoch", default=1)
+parser.add_argument(
+    "-wds", "--weight_dense_swin", help="weight of dense swin", default=1
+)
+parser.add_argument(
+    "-wd", "--weight_density_head", help="weight of density head", default=0.25
+)
 args = parser.parse_args()
 
 EPOCHS = args.epochs
-TARGET_SIZE = (224, 384)
-W_DS = 1.0
-W_D = 0.25
+W_DS = args.weight_dense_swin
+W_D = args.weight_density_head
 
 transform = v2.Compose(
     [
-        v2.Resize(TARGET_SIZE),
+        v2.Resize((224, 384)),
         v2.ToImage(),
         v2.ToDtype(dtype=torch.float32, scale=True),
         v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
@@ -56,60 +62,30 @@ params = [
 ]
 optimizer = torch.optim.AdamW(params, weight_decay=0.05)
 
-
-def train_one_epoch(epoch_index, tb_writer):
-
-    running_loss = 0
-    last_loss = 0
-
-    for i, data in enumerate(training_loader):
-
-        frame, conD, map = [x.to(device) for x in data]
-
-        optimizer.zero_grad()
-
-        F_ds, D = model(frame)
-
-        loss = (W_DS * DS_loss(F_ds, conD)) + (W_D * D_loss(D, map))
-
-        loss.backward()
-
-        optimizer.step()
-
-        running_loss += loss.item()
-        if i % 1000 == 999:
-            last_loss = running_loss / 1000  # loss per batch
-            print("  batch {} loss: {}".format(i + 1, last_loss))
-            tb_x = epoch_index * len(training_loader) + i + 1
-            tb_writer.add_scalar("Loss/train", last_loss, tb_x)
-            running_loss = 0.0
-
-    return last_loss
-
+early_stopper = EarlyStopper(patience=5, min_delta=0.001)
 
 timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
 writer = SummaryWriter(
     os.path.join(MODEL_CONFIG.logs, f"density_module_trainer{timestamp}")
 )
 
-epoch_number = 0
-
-best_vloss = 1_000_000.0
+best_vloss = float("inf")
 
 for epoch in range(EPOCHS):
-    print("EPOCH {}:".format(epoch_number + 1))
 
+    """
+    TRAINING
+    """
+    # set model to training mode
     model.train(True)
-    avg_loss = train_one_epoch(epoch_number, writer)
 
-    running_vloss = 0.0
+    with tqdm(training_loader) as tepoch:
 
-    # set the model to evaluation mode
-    model.eval()
+        tepoch.set_description(f"Training Epoch {epoch}")
+        running_loss = 0
+        total_loss = 0
 
-    # Disable gradient computation and reduce memory consumption.
-    with torch.no_grad():
-        for i, data in enumerate(validation_loader):
+        for i, data in enumerate(tepoch):
 
             frame, conD, map = [x.to(device) for x in data]
 
@@ -117,28 +93,78 @@ for epoch in range(EPOCHS):
 
             F_ds, D = model(frame)
 
-            vloss = (W_DS * DS_loss(F_ds, conD)) + (W_D * D_loss(D, map))
-            running_vloss += vloss
+            loss = (W_DS * DS_loss(F_ds, conD)) + (W_D * D_loss(D, map))
 
-    avg_vloss = running_vloss / (len(validation_loader) + 1)
+            loss.backward()
+
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            tepoch.set_postfix(loss=loss.item)
+
+            if i % 100 == 99:
+                batch_avg_loss = running_loss / 100  # loss per batch
+                tb_x = epoch * len(training_loader) + i + 1
+                writer.add_scalar("Loss/train", batch_avg_loss, tb_x)
+                total_loss += running_loss
+                running_loss = 0.0
+
+        avg_loss = total_loss / len(training_loader)
+
+    """
+    VALIDATION
+    """
+    # set the model to evaluation mode
+    model.eval()
+
+    # Disable gradient computation and reduce memory consumption.
+    with torch.no_grad():
+
+        with tqdm(training_loader) as tepoch:
+
+            tepoch.set_description(f"Training Epoch {epoch}")
+            running_vloss = 0.0
+
+            for i, data in enumerate(tepoch):
+
+                frame, conD, map = [x.to(device) for x in data]
+
+                optimizer.zero_grad()
+
+                F_ds, D = model(frame)
+
+                vloss = (W_DS * DS_loss(F_ds, conD)) + (W_D * D_loss(D, map))
+
+                running_vloss += vloss
+
+                tepoch.set_postfix(loss=vloss.item)
+
+            avg_vloss = running_vloss / len(validation_loader)
+
     print("LOSS train {} valid {}".format(avg_loss, avg_vloss))
 
     writer.add_scalars(
         "Training vs. Validation Loss",
         {"Training": avg_loss, "Validation": avg_vloss},
-        epoch_number + 1,
+        epoch + 1,
     )
     writer.flush()
 
     # Track best performance, and save the model's state
     if avg_vloss < best_vloss:
         best_vloss = avg_vloss
-        model_path = "model_{}_{}".format(timestamp, epoch_number)
+        model_path = "model_{}_{}".format(timestamp, epoch+1)
         torch.save(
             model.state_dict(),
             os.path.join(
-                MODEL_CONFIG.checkpoints, f"density_module_{epoch_number}.pth"
+                MODEL_CONFIG.checkpoints, f"density_module_{epoch+1}.pth"
             ),
         )
 
-    epoch_number += 1
+    # Check for early stop
+    if early_stopper.early_stop(avg_vloss):
+        print("Early Stopping")
+        break
+
+writer.close()

@@ -130,9 +130,9 @@ for epoch in range(EPOCHS):
     # Disable gradient computation and reduce memory consumption.
     with torch.no_grad():
 
-        with tqdm(training_loader) as tepoch:
+        with tqdm(validation_loader) as tepoch:
 
-            tepoch.set_description(f"Training Epoch {epoch+1}")
+            tepoch.set_description(f"Validation Epoch {epoch+1}")
             running_vloss = 0.0
 
             for i, data in enumerate(tepoch):

@@ -52,7 +52,7 @@ validation_set = TrafficDensityDataset(
 )
 
 training_loader = torch.utils.data.DataLoader(
-    training_set, batch_size=1, shuffle=True, num_workers=4, pin_memory=True
+    training_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True
 )
 validation_loader = torch.utils.data.DataLoader(
     validation_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True
@@ -73,9 +73,9 @@ optimizer = torch.optim.AdamW(params, weight_decay=0.05)
 
 early_stopper = EarlyStopper(patience=5, min_delta=0.001)
 
-timestamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
+timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
 writer = SummaryWriter(
-    os.path.join(MODEL_CONFIG.logs, f"density_module_trainer{timestamp}")
+    os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_{timestamp}")
 )
 
 best_vloss = float("inf")
@@ -112,6 +112,7 @@ for epoch in range(EPOCHS):
 
             tepoch.set_postfix(loss=loss.item())
 
+            # log loss per batch
             if i % 100 == 99:
                 batch_avg_loss = running_loss / 100  # loss per batch
                 tb_x = epoch * len(training_loader) + i + 1
@@ -139,13 +140,11 @@ for epoch in range(EPOCHS):
 
                 frame, conD, map = [x.to(device) for x in data]
 
-                optimizer.zero_grad()
-
                 F_ds, D = model(frame)
 
                 vloss = (W_DS * DS_loss(F_ds, conD)) + (W_D * D_loss(D, map))
 
-                running_vloss += vloss
+                running_vloss += vloss.item()
 
                 tepoch.set_postfix(loss=vloss.item())
 
@@ -154,7 +153,7 @@ for epoch in range(EPOCHS):
     print("LOSS train {} valid {}".format(avg_loss, avg_vloss))
 
     writer.add_scalars(
-        "Training vs. Validation Loss",
+        "Loss/training v/s validation",
         {"Training": avg_loss, "Validation": avg_vloss},
         epoch + 1,
     )

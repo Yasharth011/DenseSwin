@@ -27,8 +27,15 @@ parser.add_argument(
 parser.add_argument(
     "-wd", "--weight_density_head", help="weight of density head", default=0.25
 )
-parser.add_argument("-lr_b", "--learning_rate_backbone", help="learning rate of backbone", default=1e-5)
-parser.add_argument("-lr", "--learning_rate", help="learning rate of neck, density and regression head ", default=1e-4)
+parser.add_argument(
+    "-lr_b", "--learning_rate_backbone", help="learning rate of backbone", default=1e-5
+)
+parser.add_argument(
+    "-lr",
+    "--learning_rate",
+    help="learning rate of neck, density and regression head ",
+    default=1e-4,
+)
 parser.add_argument("-d", "--decay", help="weight decay", default=0.05)
 args = parser.parse_args()
 
@@ -88,7 +95,7 @@ scheduler = OneCycleLR(
     epochs=EPOCHS,
     steps_per_epoch=len(training_loader),
     pct_start=0.1,  # 10% of training warming up
-    anneal_strategy="cos", 
+    anneal_strategy="cos",
 )
 
 early_stopper = EarlyStopper(patience=5, min_delta=0.001)
@@ -98,7 +105,7 @@ writer = SummaryWriter(os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_{times
 
 
 best_vloss = float("inf")
-epoch = 0 
+epoch = 0
 early_stop = True
 for epoch in range(EPOCHS):
 
@@ -207,11 +214,10 @@ for epoch in range(EPOCHS):
     # Track best performance, and save the model's state
     if avg_vloss < best_vloss:
         best_vloss = avg_vloss
-        model_path = "model_{}_{}".format(timestamp, epoch + 1)
         torch.save(
             model.state_dict(),
             os.path.join(
-                f"DenseSwin_{timestamp}_epoch{epoch+1}.pth",
+                MODEL_CONFIG.checkpoints, f"DenseSwin_{timestamp}_epoch{epoch+1}.pth"
             ),
         )
 
@@ -221,7 +227,7 @@ for epoch in range(EPOCHS):
         print("Early Stopping")
         break
 
-# log hyperparams 
+# log hyperparams
 text = f"""
 **Epochs**: {EPOCHS} | Early Stop = {(epoch+1) if early_stop else 'No'}
 **Weight**: Dense Swin = {W_DS} | Density Head = {W_D} 
@@ -230,5 +236,6 @@ text = f"""
 **Best Loss**: {best_vloss}
 """
 writer.add_text("Hyperparameters", text)
+writer.flush()
 
 writer.close()

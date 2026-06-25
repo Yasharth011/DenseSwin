@@ -5,13 +5,25 @@ import torch
 from torchvision.transforms import ToTensor, Resize
 import numpy as np
 from PIL import Image
+import argparse
+from utils import MODEL_CONFIG
+import os
 
-checkpoint = torch.load('checkpoints/density_module_3.pth', weights_only=True)
-model = DenseSwin().to(device='cuda:0')
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-c", "--checkpoint", help="model weights checkpoint")
+parser.add_argument(
+    "-v", "--video", help="video for evaludation")
+args = parser.parse_args()
+
+checkpoint = torch.load(os.path.join(MODEL_CONFIG.checkpoints, args.checkpoint), weights_only=True)
+model = DenseSwin()
 model.load_state_dict(checkpoint)
 model.eval()
+model.to(device=device)
 
-vr = VideoReader('test3.mp4', ctx=cpu(0))
+vr = VideoReader(args.video, ctx=cpu(0))
 
 frames_batch = np.linspace(0, len(vr) - 1, num=8, dtype=int)
 
@@ -27,6 +39,7 @@ for frame in frames:
 
 tensor = torch.stack(frame_list, dim=0).permute(1, 0, 2, 3)
 tensor = tensor.unsqueeze(0)
-tensor = tensor.to(device='cuda:0')
+tensor = tensor.to(device=device)
+
 conD, _ = model(tensor)
-print('Congestion factor : ',conD)
+print('Congestion factor : ', conD)

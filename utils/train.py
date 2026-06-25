@@ -87,8 +87,8 @@ scheduler = OneCycleLR(
     max_lr=[LR_B, LR, LR, LR],
     epochs=EPOCHS,
     steps_per_epoch=len(training_loader),
-    pct_start=0.1,  # Spends the first 10% of training warming up
-    anneal_strategy="cos",  # Uses the smooth cosine curve to drop
+    pct_start=0.1,  # 10% of training warming up
+    anneal_strategy="cos", 
 )
 
 early_stopper = EarlyStopper(patience=5, min_delta=0.001)

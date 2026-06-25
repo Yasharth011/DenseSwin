@@ -21,7 +21,7 @@ class RegressionMetrics:
             t = list(t)
         
         self.predictions.append(p)
-        self.targets.append(t)
+        self.truths.append(t)
 
     def compute(self):
 
@@ -29,7 +29,7 @@ class RegressionMetrics:
             return 0.0, 0.0, 0.0
             
         p = np.array(self.predictions)
-        t = np.array(self.targets)
+        t = np.array(self.truths)
         
         mae = mean_absolute_error(t, p)
         mse = mean_squared_error(t, p)

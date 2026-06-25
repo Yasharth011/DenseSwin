@@ -27,9 +27,9 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-EPOCHS = args.epochs
-W_DS = args.weight_dense_swin
-W_D = args.weight_density_head
+EPOCHS = int(args.epochs)
+W_DS = float(args.weight_dense_swin)
+W_D = float(args.weight_density_head)
 
 transform = v2.Compose(
     [
@@ -153,7 +153,7 @@ for epoch in range(EPOCHS):
     print("LOSS train {} valid {}".format(avg_loss, avg_vloss))
 
     writer.add_scalars(
-        "Loss/training v/s validation",
+        "Loss",
         {"Training": avg_loss, "Validation": avg_vloss},
         epoch + 1,
     )
@@ -165,7 +165,7 @@ for epoch in range(EPOCHS):
         model_path = "model_{}_{}".format(timestamp, epoch + 1)
         torch.save(
             model.state_dict(),
-            os.path.join(MODEL_CONFIG.checkpoints, f"density_module_{epoch+1}.pth"),
+            os.path.join(MODEL_CONFIG.checkpoints, f"DenseSwin_{timestamp}_epoch{epoch+1}.pth"),
         )
 
     # Check for early stop

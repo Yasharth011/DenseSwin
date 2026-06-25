@@ -42,9 +42,9 @@ args = parser.parse_args()
 EPOCHS = int(args.epochs)
 W_DS = float(args.weight_dense_swin)
 W_D = float(args.weight_density_head)
-LR_B = float(args.lr_backbone)
-LR = float(args.lr)
-D = float(args.d)
+LR_B = float(args.learning_rate_backbone)
+LR = float(args.learning_rate)
+D = float(args.decay)
 
 transform = v2.Compose(
     [
@@ -136,6 +136,7 @@ for epoch in range(EPOCHS):
             scheduler.step()
 
             running_loss += loss.item()
+            total_loss +=loss.item()
 
             train_metrics.update(F_ds, conD)
 
@@ -146,7 +147,6 @@ for epoch in range(EPOCHS):
                 batch_avg_loss = running_loss / 100  # loss per batch
                 tb_x = epoch * len(training_loader) + i + 1
                 writer.add_scalar("Loss/train", batch_avg_loss, tb_x)
-                total_loss += running_loss
                 running_loss = 0.0
 
         avg_loss = total_loss / len(training_loader)
@@ -175,7 +175,7 @@ for epoch in range(EPOCHS):
 
                 running_vloss += vloss.item()
 
-                val_metrics.update()
+                val_metrics.update(F_ds, conD)
 
                 tepoch.set_postfix(loss=vloss.item())
 
@@ -210,6 +210,9 @@ for epoch in range(EPOCHS):
     )
 
     writer.flush()
+
+    train_metrics.reset()
+    val_metrics.reset()
 
     # Track best performance, and save the model's state
     if avg_vloss < best_vloss:

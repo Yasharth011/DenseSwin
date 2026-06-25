@@ -165,7 +165,7 @@ for epoch in range(EPOCHS):
         model_path = "model_{}_{}".format(timestamp, epoch + 1)
         torch.save(
             model.state_dict(),
-            os.path.join(MODEL_CONFIG.checkpoints, f"DenseSwin_{timestamp}_epoch{epoch+1}.pth"),
+            os.path.join(MODEL_CONFIG.checkpoints, f"DenseSwin_{W_DS}_{W_D}_{timestamp}_epoch{epoch+1}.pth"),
         )
 
     # Check for early stop

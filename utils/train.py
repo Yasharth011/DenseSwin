@@ -21,6 +21,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-e", "--epochs", help="number of epoch", default=1)
+parser.add_argument("-b", "--batch", help="data batch size", default=1)
 parser.add_argument(
     "-wds", "--weight_dense_swin", help="weight of dense swin", default=1
 )
@@ -40,6 +41,7 @@ parser.add_argument("-d", "--decay", help="weight decay", default=0.05)
 args = parser.parse_args()
 
 EPOCHS = int(args.epochs)
+BATCH = int(args.batch)
 W_DS = float(args.weight_dense_swin)
 W_D = float(args.weight_density_head)
 LR_B = float(args.learning_rate_backbone)
@@ -67,10 +69,10 @@ validation_set = TrafficDensityDataset(
 )
 
 training_loader = torch.utils.data.DataLoader(
-    training_set, batch_size=1, shuffle=True, num_workers=4, pin_memory=True
+    training_set, batch_size=BATCH, shuffle=True, num_workers=4, pin_memory=True
 )
 validation_loader = torch.utils.data.DataLoader(
-    validation_set, batch_size=1, shuffle=False, num_workers=4, pin_memory=True
+    validation_set, batch_size=BATCH, shuffle=False, num_workers=4, pin_memory=True
 )
 
 model = DenseSwin().to(device)

@@ -7,7 +7,6 @@ from utils import (
     TRAIN_DATASET,
     MODEL_CONFIG,
     EarlyStopper,
-    early_stopper,
     RegressionMetrics,
 )
 import torch
@@ -16,6 +15,7 @@ from datetime import datetime
 import argparse
 from tqdm import tqdm
 from torch.optim.lr_scheduler import OneCycleLR
+import math
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -46,7 +46,7 @@ W_DS = float(args.weight_dense_swin)
 W_D = float(args.weight_density_head)
 LR_B = float(args.learning_rate_backbone)
 LR = float(args.learning_rate)
-D = float(args.decay)
+DECAY = float(args.decay)
 
 transform = v2.Compose(
     [
@@ -89,7 +89,7 @@ params = [
     {"params": model.neck.parameters(), "lr": LR},
     {"params": model.head.parameters(), "lr": LR},
 ]
-optimizer = torch.optim.AdamW(params, weight_decay=D)
+optimizer = torch.optim.AdamW(params, weight_decay=DECAY)
 
 scheduler = OneCycleLR(
     optimizer,
@@ -145,10 +145,11 @@ for epoch in range(EPOCHS):
             tepoch.set_postfix(loss=loss.item())
 
             # log loss per batch
-            if i % 100 == 99:
+            epoch_batch = 10**(math.floor(math.log10(len(training_loader)/BATCH)))
+            if i % epoch_batch == epoch_batch-1:
                 batch_avg_loss = running_loss / 100  # loss per batch
                 tb_x = epoch * len(training_loader) + i + 1
-                writer.add_scalar("Loss/train", batch_avg_loss, tb_x)
+                writer.add_scalar("Loss/Train", {"BatchAvg": batch_avg_loss}, tb_x)
                 running_loss = 0.0
 
         avg_loss = total_loss / len(training_loader)
@@ -237,7 +238,7 @@ text = f"""
 **Epochs**: {EPOCHS} | Early Stop = {(epoch+1) if early_stop else 'No'}
 **Weight**: Dense Swin = {W_DS} | Density Head = {W_D} 
 **Learning Rate**: Head = {LR} | Backbone = {LR_B}
-**Decay**: {D}
+**Decay**: {DECAY}
 **Best Loss**: {best_vloss}
 """
 writer.add_text("Hyperparameters", text)

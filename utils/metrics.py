@@ -14,14 +14,14 @@ class RegressionMetrics:
 
         p = prediction.detach().cpu().squeeze().numpy().tolist()
         
-        t = np.array([])
+        t = []
         if isinstance(truth, torch.Tensor):
             t = truth.detach().cpu().squeeze().numpy().tolist()
         elif isinstance(truth, int): 
             t = list(t)
         
-        self.predictions.append(p)
-        self.truths.append(t)
+        self.predictions.extend(p)
+        self.truths.extend(t)
 
     def compute(self):
 
@@ -40,4 +40,4 @@ class RegressionMetrics:
     def reset(self):
 
         self.predictions = []
-        self.targets = []
+        self.truths = []

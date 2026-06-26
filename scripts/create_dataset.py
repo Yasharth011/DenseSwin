@@ -79,8 +79,6 @@ def get_conD(bboxes, roi_area=224 * 384, max_expected_cars=30):
 
     conD = sequence_conD_sum / (num_frames - 1)
 
-    conD = conD/4 # norm the value between 0 to 1
-
     return float(conD)
 
 
@@ -175,6 +173,7 @@ def create_dataset(dataset, BATCH_SIZE=10, num_frames=8, annotate=False, CONF=0.
 
             i = i + 1
 
+    
     if len(dataset_rows):
         df = pd.DataFrame(dataset_rows)
         df.to_csv(csv_path, mode="a", header=headers, index=False)

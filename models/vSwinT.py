@@ -7,7 +7,6 @@ from torchvision.models.swin_transformer import PatchMerging, SwinTransformerBlo
 from torchvision.models.video.swin_transformer import (
     ShiftedWindowAttention3d,
     PatchEmbed3d,
-    Swin3D_T_Weights
 )
 from functools import partial
 from einops import rearrange  

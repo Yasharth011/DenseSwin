@@ -53,6 +53,8 @@ class TrafficDensityDataset(Dataset):
             json.loads(bboxes),
         )
 
+        conD = (conD - self.csv['conD'].min()) / (self.csv['conD'].max() - self.csv['conD'].min())
+
         vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
 
         frames = vr.get_batch(frames_batch).asnumpy()

@@ -149,7 +149,7 @@ for epoch in range(EPOCHS):
             if i % epoch_batch == epoch_batch-1:
                 batch_avg_loss = running_loss / 100  # loss per batch
                 tb_x = epoch * len(training_loader) + i + 1
-                writer.add_scalar("Loss/Train", {"BatchAvg": batch_avg_loss}, tb_x)
+                writer.add_scalar("Loss/Train_Batch_Avg", batch_avg_loss, tb_x)
                 running_loss = 0.0
 
         avg_loss = total_loss / len(training_loader)
@@ -239,7 +239,6 @@ text = f"""
 **Weight**: Dense Swin = {W_DS} | Density Head = {W_D} 
 **Learning Rate**: Head = {LR} | Backbone = {LR_B}
 **Decay**: {DECAY}
-**Best Loss**: {best_vloss}
 """
 writer.add_text("Hyperparameters", text)
 writer.flush()

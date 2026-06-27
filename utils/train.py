@@ -26,7 +26,7 @@ parser.add_argument(
     "-wds", "--weight_dense_swin", help="weight of dense swin", default=1
 )
 parser.add_argument(
-    "-wd", "--weight_density_head", help="weight of density head", default=0.25
+    "-wd", "--weight_density_head", help="weight of density head", default=0.5
 )
 parser.add_argument(
     "-lr_b", "--learning_rate_backbone", help="learning rate of backbone", default=1e-5

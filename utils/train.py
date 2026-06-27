@@ -145,7 +145,7 @@ for epoch in range(EPOCHS):
             tepoch.set_postfix(loss=loss.item())
 
             # log loss per batch
-            epoch_batch = 10**(math.floor(math.log10(len(training_loader)/BATCH)))
+            epoch_batch = 10**(math.floor(math.log10(len(training_loader))))
             if i % epoch_batch == epoch_batch-1:
                 batch_avg_loss = running_loss / 100  # loss per batch
                 tb_x = epoch * len(training_loader) + i + 1

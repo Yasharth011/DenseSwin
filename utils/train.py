@@ -100,7 +100,7 @@ scheduler = OneCycleLR(
     anneal_strategy="cos",
 )
 
-early_stopper = EarlyStopper(patience=5, min_delta=0.001)
+# early_stopper = EarlyStopper(patience=5, min_delta=0.001)
 
 timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
 writer = SummaryWriter(os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_{timestamp}"))
@@ -228,10 +228,10 @@ for epoch in range(EPOCHS):
         )
 
     # Check for early stop
-    early_stop = early_stopper.early_stop(avg_vloss)
-    if early_stop:
-        print("Early Stopping")
-        break
+    # early_stop = early_stopper.early_stop(avg_vloss)
+    # if early_stop:
+    #     print("Early Stopping")
+    #     break
 
 # log hyperparams
 text = f"""

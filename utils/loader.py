@@ -10,8 +10,8 @@ from decord import VideoReader, cpu
 from torchvision import tv_tensors
 
 
-class TrafficDensityDataset(Dataset):
-    """Traffic Dataset for Density Estimation"""
+class CBT2015(Dataset):
+    """Dataset Loader for CBT2015"""
 
     def __init__(self, root_dir, csv_path, transform=None):
         self.csv = pd.read_csv(csv_path, header=0)

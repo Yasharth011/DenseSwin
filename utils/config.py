@@ -3,7 +3,7 @@ import os
 
 
 @dataclass
-class DatasetConfig:
+class CBT2015Config:
     parent_path: str
 
     videos: str = field(init=False)
@@ -28,6 +28,6 @@ class ModelConfig:
         self.checkpoints = os.path.join(self.parent_path, "checkpoints")
 
 
-TRAIN_DATASET = DatasetConfig("dataset/train")
-TEST_DATASET = DatasetConfig("dataset/test")
+CBT2015_TRAIN = CBT2015Config("dataset/CBT2015/train")
+CBT2015_VAL = CBT2015Config("dataset/CBT2015/validation")
 MODEL_CONFIG = ModelConfig("")

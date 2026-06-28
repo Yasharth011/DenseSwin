@@ -100,7 +100,9 @@ scheduler = OneCycleLR(
 )
 
 timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
-writer = SummaryWriter(os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_{timestamp}"))
+writer = SummaryWriter(
+    os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_CBT2015_{timestamp}")
+)
 
 
 best_vloss = float("inf")
@@ -220,13 +222,15 @@ for epoch in range(EPOCHS):
         torch.save(
             model.state_dict(),
             os.path.join(
-                MODEL_CONFIG.checkpoints, f"DenseSwin_{timestamp}_epoch{epoch+1}.pth"
+                MODEL_CONFIG.checkpoints,
+                f"DenseSwin_CBT2015_{timestamp}",
+                f"epoch{epoch+1}.pth",
             ),
         )
 
 # log hyperparams
 text = f"""
-**Epochs**: {EPOCHS} | Early Stop = {(epoch+1) if early_stop else 'No'}
+**Epochs**: {EPOCHS}
 **Weight**: Dense Swin = {W_DS} | Density Head = {W_D} 
 **Learning Rate**: Head = {LR} | Backbone = {LR_B}
 **Decay**: {DECAY}

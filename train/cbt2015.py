@@ -1,14 +1,6 @@
 from models import DenseSwin
 from torchvision.transforms import v2
 from torch.utils.tensorboard import SummaryWriter
-from utils import (
-    TrafficDensityDataset,
-    TEST_DATASET,
-    TRAIN_DATASET,
-    MODEL_CONFIG,
-    EarlyStopper,
-    RegressionMetrics,
-)
 import torch
 import os
 from datetime import datetime
@@ -16,6 +8,13 @@ import argparse
 from tqdm import tqdm
 from torch.optim.lr_scheduler import OneCycleLR
 import math
+from utils import (
+    CBT2015,
+    CBT2015_TRAIN,
+    CBT2015_VAL,
+    MODEL_CONFIG,
+    RegressionMetrics,
+)
 
 device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
@@ -57,14 +56,14 @@ transform = v2.Compose(
     ]
 )
 
-training_set = TrafficDensityDataset(
-    TRAIN_DATASET.videos,
-    TRAIN_DATASET.csv,
+training_set = CBT2015(
+    CBT2015_TRAIN.videos,
+    CBT2015_TRAIN.csv,
     transform=transform,
 )
-validation_set = TrafficDensityDataset(
-    TEST_DATASET.videos,
-    TEST_DATASET.csv,
+validation_set = CBT2015(
+    CBT2015_VAL.videos,
+    CBT2015_VAL.csv,
     transform=transform,
 )
 
@@ -99,8 +98,6 @@ scheduler = OneCycleLR(
     pct_start=0.1,  # 10% of training warming up
     anneal_strategy="cos",
 )
-
-# early_stopper = EarlyStopper(patience=5, min_delta=0.001)
 
 timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
 writer = SummaryWriter(os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_{timestamp}"))
@@ -138,15 +135,15 @@ for epoch in range(EPOCHS):
             scheduler.step()
 
             running_loss += loss.item()
-            total_loss +=loss.item()
+            total_loss += loss.item()
 
             train_metrics.update(F_ds, conD)
 
             tepoch.set_postfix(loss=loss.item())
 
             # log loss per batch
-            epoch_batch = 10**(math.floor(math.log10(len(training_loader))))
-            if i % epoch_batch == epoch_batch-1:
+            epoch_batch = 10 ** (math.floor(math.log10(len(training_loader))))
+            if i % epoch_batch == epoch_batch - 1:
                 batch_avg_loss = running_loss / 100  # loss per batch
                 tb_x = epoch * len(training_loader) + i + 1
                 writer.add_scalar("Loss/Train_Batch_Avg", batch_avg_loss, tb_x)
@@ -226,12 +223,6 @@ for epoch in range(EPOCHS):
                 MODEL_CONFIG.checkpoints, f"DenseSwin_{timestamp}_epoch{epoch+1}.pth"
             ),
         )
-
-    # Check for early stop
-    # early_stop = early_stopper.early_stop(avg_vloss)
-    # if early_stop:
-    #     print("Early Stopping")
-    #     break
 
 # log hyperparams
 text = f"""

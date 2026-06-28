@@ -223,8 +223,7 @@ for epoch in range(EPOCHS):
             model.state_dict(),
             os.path.join(
                 MODEL_CONFIG.checkpoints,
-                f"DenseSwin_CBT2015_{timestamp}",
-                f"epoch{epoch+1}.pth",
+                f"DenseSwin_CBT2015_{timestamp}_epoch{epoch+1}.pth",
             ),
         )
 

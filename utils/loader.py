@@ -118,8 +118,9 @@ class UCSD(Dataset):
         file_name, label = self.csv.iloc[idx]
 
         label = self.label_map[label.strip().lower()]
+        label = torch.tensor(label, dtype=torch.long)
 
-        vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
+        vr = VideoReader(os.path.join(self.root_dir, file_name+'.avi'), ctx=cpu(0))
 
         # skip the corrupted first frame in UCSD
         frames_batch = np.linspace(1, len(vr) - 1, num=self.num_frames, dtype=int)

@@ -141,6 +141,7 @@ for fold in range(4):
                 optimizer.zero_grad()
 
                 F_ds, _ = model(frame)
+                F_ds = torch.argmax(F_ds, dim=1)
 
                 loss = CEloss(F_ds, label)
                 loss.backward()
@@ -186,6 +187,7 @@ for fold in range(4):
                     frame, label = [x.to(device) for x in data]
 
                     F_ds, _ = model(frame)
+                    F_ds = torch.argmax(F_ds, dim=1)
 
                     vloss = CEloss(F_ds, label)
 

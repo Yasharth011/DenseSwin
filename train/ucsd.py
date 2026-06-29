@@ -45,11 +45,11 @@ transform = v2.Compose(
     ]
 )
 
-checkpoint = torch.load(
-    os.path.join(MODEL_CONFIG.checkpoints, args.checkpoint), weights_only=True
-)
-model = DenseSwin(3)
-model.load_state_dict(checkpoint)
+# checkpoint = torch.load(
+#     os.path.join(MODEL_CONFIG.checkpoints, args.checkpoint), weights_only=True
+# )
+model = DenseSwin(num_class=3)
+# model.load_state_dict(checkpoint)
 model.to(device=device)
 
 # freeze back and density head
@@ -58,24 +58,24 @@ for name, layer in model.named_children():
         for param in layer.parameters():
             param.requires_grad = False
 
-master_set = UCSD(UCSD_MASTER.videos, UCSD_MASTER.csv, 8)
+master_set = UCSD(UCSD_MASTER.videos, UCSD_MASTER.csv, 8, transform)
 
 CEloss = torch.nn.CrossEntropyLoss()
 
 train_metrics = val_metrics = MetricCollection(
     {
-        "accuracy": Accuracy(task="multiclass"),
-        "precision": Precision(num_classes=3, average="macro", task="multiclass"),
-        "recall": Recall(num_classes=3, average="macro", task="multiclass"),
-        "f1score": F1Score(num_classes=3, average="macro", task="multiclass"),
+        "accuracy": Accuracy(num_classes=3, average='weighted', task="multiclass"),
+        "precision": Precision(num_classes=3, average="weighted", task="multiclass"),
+        "recall": Recall(num_classes=3, average="weighted", task="multiclass"),
+        "f1score": F1Score(num_classes=3, average="weighted", task="multiclass"),
     }
 )
 val_metrics = MetricCollection(
     {
-        "accuracy": Accuracy(task="multiclass"),
-        "precision": Precision(num_classes=3, average="macro", task="multiclass"),
-        "recall": Recall(num_classes=3, average="macro", task="multiclass"),
-        "f1score": F1Score(num_classes=3, average="macro", task="multiclass"),
+        "accuracy": Accuracy(num_classes=3, average='weighted', task="multiclass"),
+        "precision": Precision(num_classes=3, average="weighted", task="multiclass"),
+        "recall": Recall(num_classes=3, average="weighted", task="multiclass"),
+        "f1score": F1Score(num_classes=3, average="weighted", task="multiclass"),
     }
 )
 

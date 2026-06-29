@@ -105,6 +105,7 @@ class UCSD(Dataset):
         self.root_dir = root_dir
         self.transform = transform
         self.num_frames = num_frames
+        self.label_map = {"light": 0, "medium": 1, "heavy": 2}
 
     def __len__(self):
         return len(self.csv)
@@ -115,6 +116,8 @@ class UCSD(Dataset):
             idx = idx.tolist()
 
         file_name, label = self.csv.iloc[idx]
+
+        label = self.label_map[label.strip().lower()]
 
         vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
 

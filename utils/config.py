@@ -17,6 +17,22 @@ class CBT2015Config:
 
 
 @dataclass
+class UCSDConfig:
+    parent_path: str
+
+    videos: str = field(init=False)
+    master_csv: str = field(init=False)
+    train_csv: str = field(init=False)
+    test_csv: str = field(init=False)
+
+    def __post_init__(self):
+        self.videos = os.path.join(self.parent_path, "video")
+        self.csv = os.path.join(self.parent_path, "ImageMaster")
+        self.train_csv = os.path.join(self.parent_path, "EvalSet_train")
+        self.test_csv = os.path.join(self.parent_path, "EvalSet_test")
+
+
+@dataclass
 class ModelConfig:
     parent_path: str
 
@@ -30,4 +46,7 @@ class ModelConfig:
 
 CBT2015_TRAIN = CBT2015Config("dataset/CBT2015/train")
 CBT2015_VAL = CBT2015Config("dataset/CBT2015/validation")
+
+UCSD_MASTER = UCSDConfig("dataset/UCSD")
+
 MODEL_CONFIG = ModelConfig("")

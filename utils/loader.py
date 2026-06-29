@@ -53,7 +53,9 @@ class CBT2015(Dataset):
             json.loads(bboxes),
         )
 
-        conD = (conD - self.csv['conD'].min()) / (self.csv['conD'].max() - self.csv['conD'].min())
+        conD = (conD - self.csv["conD"].min()) / (
+            self.csv["conD"].max() - self.csv["conD"].min()
+        )
 
         vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
 
@@ -78,9 +80,7 @@ class CBT2015(Dataset):
                 H, W = frame.shape[-2:]
 
             map = self._getmap((H, W), tv_bbox.cpu().numpy())
-            map = (
-                torch.from_numpy(map).unsqueeze(0).float()
-            )
+            map = torch.from_numpy(map).unsqueeze(0).float()
 
             frame_list.append(frame)
             map_list.append(map)
@@ -89,3 +89,52 @@ class CBT2015(Dataset):
         map_list = torch.stack(map_list, dim=0).permute(1, 0, 2, 3)
 
         return (frame_list, conD, map_list)
+
+
+class UCSD(Dataset):
+    """Dataset Loader for UCSD"""
+
+    def __init__(self, root_dir, csv_path, num_frames, transform=None):
+        self.csv = pd.read_csv(
+            csv_path,
+            names=["index", "filename", "class"],
+            index_col=0,
+            skiprows=1,
+            sep="\t",
+        )
+        self.root_dir = root_dir
+        self.transform = transform
+        self.num_frames = num_frames
+
+    def __len__(self):
+        return len(self.csv)
+
+    def __getitem__(self, idx):
+
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        file_name, label = self.csv.iloc[idx]
+
+        vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
+
+        frames_batch = np.linspace(0, len(vr) - 1, num=self.num_frames, dtype=int)
+
+        frames = [
+            Image.fromarray(frame) for frame in vr.get_batch(frames_batch).asnumpy()
+        ]
+
+        if self.transform:
+            frames = [self.transform(frame) for frame in frames]
+
+        tensor = torch.stack(frames, dim=0).permute(1, 0, 2, 3)
+
+        return (tensor, label)
+
+    def get_subset(self, path, fold=0):
+
+        with open(path, "r") as file:
+            lines = file.readlines()
+            indices = [int(idx) for idx in lines[fold].strip().split(",")]
+
+        return indices

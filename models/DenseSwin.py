@@ -15,6 +15,7 @@ class DenseSwin(nn.Module):
         backbone (nn.Module): Backbone Network, Default: VSwinTransformer
         density_head (nn.Module): Density Map Network, Default: densityConv
         neck (nn.Module): Neck Network, Default: VSwinTransformer(Decoder)
+        num_class (nn.Module): number of classes for Classification, Default: 1 (Regression)
     """
 
     def __init__(
@@ -23,6 +24,7 @@ class DenseSwin(nn.Module):
         backbone: Optional[nn.Module] = None,
         density_head: Optional[nn.Module] = None,
         neck: Optional[nn.Module] = None,
+        num_class: int = 1
     ):
         super().__init__()
 
@@ -57,7 +59,7 @@ class DenseSwin(nn.Module):
         else:
             self.neck = neck
 
-        self.head = nn.Linear(linear_ch, 1)
+        self.head = nn.Linear(linear_ch, num_class)
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
         # x: B, C, T, H, W

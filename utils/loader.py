@@ -121,7 +121,8 @@ class UCSD(Dataset):
 
         vr = VideoReader(os.path.join(self.root_dir, file_name), ctx=cpu(0))
 
-        frames_batch = np.linspace(0, len(vr) - 1, num=self.num_frames, dtype=int)
+        # skip the corrupted first frame in UCSD
+        frames_batch = np.linspace(1, len(vr) - 1, num=self.num_frames, dtype=int)
 
         frames = [
             Image.fromarray(frame) for frame in vr.get_batch(frames_batch).asnumpy()

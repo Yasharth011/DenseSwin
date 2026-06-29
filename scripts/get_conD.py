@@ -1,12 +1,10 @@
 import os
 import numpy as np
-import pandas as pd
 import torch
 from PIL import Image, ImageDraw
 from ultralytics.models import YOLO
 from decord import VideoReader
 from decord import cpu
-import json
 
 model = YOLO("yolo11x.pt")
 
@@ -15,7 +13,7 @@ device = "0" if torch.cuda.is_available() else "cpu"
 # COCO indices for traffic elements (2: car, 3: motorcycle, 5: bus, 7: truck)
 VEHICLE_CLASSES = [2, 3, 5, 7]
 
-
+""" The conD value is UNORMALISED """
 def get_conD(bboxes, roi_area=224 * 384, max_expected_cars=30):
     """Implementation inspired from SSANET for Traffic Congestion Estimation"""
 

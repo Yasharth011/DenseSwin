@@ -118,7 +118,6 @@ class UCSD(Dataset):
         file_name, label = self.csv.iloc[idx]
 
         label = self.label_map[label.strip().lower()]
-        label = torch.tensor(label, dtype=torch.long)
 
         vr = VideoReader(os.path.join(self.root_dir, file_name+'.avi'), ctx=cpu(0))
 

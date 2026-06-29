@@ -186,13 +186,6 @@ for epoch in range(EPOCHS):
     train_mae, train_mse, train_r2 = train_metrics.compute()
     val_mae, val_mse, val_r2 = val_metrics.compute()
 
-    print(
-        f"Train: loss= {avg_loss} | mae= {train_mae} | mse= {train_mse} | r2= {train_r2}"
-    )
-    print(
-        f"Validation: loss= {avg_vloss} | mae= {val_mae} | mse= {val_mse} | r2={val_r2}"
-    )
-
     writer.add_scalars(
         "Loss",
         {"Training": avg_loss, "Validation": avg_vloss},

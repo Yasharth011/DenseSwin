@@ -61,7 +61,7 @@ class TRANCOSConfig:
 
 CBT2015_TRAIN = CBT2015Config("dataset/CBT2015/train")
 CBT2015_VAL = CBT2015Config("dataset/CBT2015/validation")
-TRANCOS = TRANCOSConfig("dataset/TRANCOS_v3")
+TRANCOS_MASTER = TRANCOSConfig("dataset/TRANCOS_v3")
 UCSD_MASTER = UCSDConfig("dataset/UCSD")
 
 MODEL_CONFIG = ModelConfig("")

@@ -8,6 +8,7 @@ from scipy.ndimage import gaussian_filter
 import numpy as np
 from decord import VideoReader, cpu
 from torchvision import tv_tensors
+import scipy.io
 
 
 class CBT2015(Dataset):
@@ -142,3 +143,42 @@ class UCSD(Dataset):
             indices = [int(idx) for idx in lines[fold].strip().split(",")]
 
         return indices
+
+class TRANCOS(Dataset):
+    """Dataset Loader for TRANCOS"""
+
+    def __init__(self, root_dir, dens_path, csv_path, transform=None):
+        self.csv = pd.read_csv(csv_path, header=None)
+        self.root_dir = root_dir
+        self.transform = transform
+        self.dens_path = dens_path
+
+    def __len__(self):
+        return len(self.csv)
+
+
+    def __getitem__(self, idx):
+
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+        
+        file_name = self.csv.iloc[idx]
+        img_loc = os.path.join(self.root_dir, file_name)
+        img = Image.open(img_loc)
+        img_name = os.path.splitext((img_loc))
+        txt_length = len(os.path.join(self.root_dir, img_name[0] + '.txt'))
+        dens = scipy.io.loadmat(os.path.join(self.dens_path, img_name[0] + '.mat'))
+        dens_key = [k for k in dens.keys() if not dens.startswith('__')]
+        dens_arr = np.array(dens[dens_key])
+        return img, txt_length, dens_arr
+
+        if self.transform:
+            img = self.transform(img)
+            dens_arr = self.transform(dens_arr)
+
+
+
+
+
+
+

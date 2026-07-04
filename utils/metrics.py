@@ -54,12 +54,12 @@ class GameMetrics:
 
     def __init__(self, target_level=3):
         self.target_level = target_level
-        self.metrics = {level: [] for level in range(target_level + 1)}
+        self.metrics = {level: [] for level in range(self.target_level + 1)}
 
     def update(self, pred_dens, gt_dens):
 
         for level in range(self.target_level + 1):
-            game = self.GM(pred_dens, gt_dens, level)
+            game = self._GM(pred_dens, gt_dens, level)
             self.metrics[level].append(game)
 
     def compute(self):
@@ -70,7 +70,10 @@ class GameMetrics:
 
         return avg_game
 
-    def GM(self, pred_dens, gt_dens, level):
+    def reset(self):
+        self.metrics = {level: [] for level in range(self.target_level + 1)}
+
+    def _GM(self, pred_dens, gt_dens, level):
 
         if level == 0:
             return float(torch.abs(torch.sum(pred_dens) - torch.sum(gt_dens)))

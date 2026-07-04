@@ -33,18 +33,6 @@ class UCSDConfig:
 
 
 @dataclass
-class ModelConfig:
-    parent_path: str
-
-    logs: str = field(init=False)
-    checkpoints: str = field(init=False)
-
-    def __post_init__(self):
-        self.logs = os.path.join(self.parent_path, "logs")
-        self.checkpoints = os.path.join(self.parent_path, "checkpoints")
-
-
-@dataclass
 class TRANCOSConfig:
     parent_path: str
 
@@ -58,6 +46,18 @@ class TRANCOSConfig:
         self.training = os.path.join(self.images, "image_sets/training")
         self.validation = os.path.join(self.images, "image_sets/validation")
         self.results = os.path.join(self.parent_path, "results")
+
+
+@dataclass
+class ModelConfig:
+    parent_path: str
+
+    logs: str = field(init=False)
+    checkpoints: str = field(init=False)
+
+    def __post_init__(self):
+        self.logs = os.path.join(self.parent_path, "logs")
+        self.checkpoints = os.path.join(self.parent_path, "checkpoints")
 
 
 CBT2015_TRAIN = CBT2015Config("dataset/CBT2015/train")

@@ -147,10 +147,10 @@ class UCSD(Dataset):
 class TRANCOS(Dataset):
     """Dataset Loader for TRANCOS"""
 
-    def __init__(self, root_dir, gt_path, csv_path, transform=None):
-        self.csv = pd.read_csv(csv_path, header=None)
-        self.root_dir = root_dir
+    def __init__(self, frame_dir, gt_path, csv_path, transform=None):
+        self.frame_dir = frame_dir
         self.gt_path = gt_path
+        self.csv = pd.read_csv(csv_path, header=None)
         self.transform = transform
 
     def __len__(self):
@@ -162,21 +162,21 @@ class TRANCOS(Dataset):
         if torch.is_tensor(idx):
             idx = idx.tolist()
         
-        img_path = os.path.join(self.root_dir, self.csv.iloc[idx])
+        frame_path = os.path.join(self.frame_dir, self.csv.iloc[idx])
 
-        img = Image.open(img_path)
+        frame = Image.open(frame_path)
 
-        gt_path = scipy.io.loadmat(os.path.join(self.gt_path, os.path.splitext(img_path)[0] + '.mat'))
+        gt_path = scipy.io.loadmat(os.path.join(self.gt_path, os.path.splitext(frame_path)[0] + '.mat'))
 
-        dense_gt = gt_path['gt']
-        dense_roi = gt_path['estDensity_ROI']
+        gt = gt_path['gt']
+        roi = gt_path['estDensity_ROI']
 
         if self.transform:
-            img = self.transform(img)
-            dense_norm = self.transform(dense_norm)
-            dense_roi = self.transform(dense_roi)
+            frame = self.transform(frame)
+            gt = self.transform(gt)
+            roi = self.transform(roi)
 
-        return img, dense_norm, dense_roi
+        return frame, gt, roi
 
 
 

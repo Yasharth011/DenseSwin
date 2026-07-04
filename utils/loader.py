@@ -176,12 +176,9 @@ class TRANCOS(Dataset):
             gt = self.transform(gt)
             roi = self.transform(roi)
 
+            # add temporal dim
+            frame = frame.unsqueeze(1)
+            gt = gt.unsqueeze(1)
+            roi = roi.unsqueeze(1)
+
         return frame, gt, roi
-
-
-
-
-
-
-
-

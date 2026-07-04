@@ -45,11 +45,11 @@ transform = v2.Compose(
     ]
 )
 
-# checkpoint = torch.load(
-#     os.path.join(MODEL_CONFIG.checkpoints, args.checkpoint), weights_only=True
-# )
+checkpoint = torch.load(
+    os.path.join(MODEL_CONFIG.checkpoints, args.checkpoint), weights_only=True
+)
 model = DenseSwin(num_class=3)
-# model.load_state_dict(checkpoint)
+model.load_state_dict(checkpoint)
 model.to(device=device)
 
 # freeze back and density head

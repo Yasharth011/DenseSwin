@@ -166,15 +166,19 @@ class TRANCOS(Dataset):
         img_loc = os.path.join(self.root_dir, file_name)
         img = Image.open(img_loc)
         img_name = os.path.splitext((img_loc))
-        txt_length = len(os.path.join(self.root_dir, img_name[0] + '.txt'))
         dens = scipy.io.loadmat(os.path.join(self.dens_path, img_name[0] + '.mat'))
-        dens_key = [k for k in dens.keys() if not dens.startswith('__')]
-        dens_arr = np.array(dens[dens_key])
-        return img, txt_length, dens_arr
+        dense_gt = dens['gt']
+        dense_roi = dens['estDensity_ROI']
+        dense_norm = dense_gt * dense_roi
+        
 
         if self.transform:
             img = self.transform(img)
-            dens_arr = self.transform(dens_arr)
+            dense_norm = self.transform(dense_norm)
+            dense_roi = self.transform(dense_roi)
+
+        return img, dense_norm, dense_roi
+
 
 
 

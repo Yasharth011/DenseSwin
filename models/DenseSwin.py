@@ -76,4 +76,7 @@ class DenseSwin(nn.Module):
 
         x = self.head(x).squeeze()
 
+        if x.shape[-1] == 1:
+            x = x.squeeze()
+
         return x, D

@@ -43,6 +43,7 @@ class ModelConfig:
         self.logs = os.path.join(self.parent_path, "logs")
         self.checkpoints = os.path.join(self.parent_path, "checkpoints")
 
+
 @dataclass
 class TRANCOSConfig:
     parent_path: str
@@ -51,13 +52,13 @@ class TRANCOSConfig:
     training: str = field(init=False)
     validation: str = field(init=False)
     results: str = field(init=False)
-    
-    def __post_init__(self){
+
+    def __post_init__(self):
         self.images = os.path.join(self.parent_path, "images")
         self.training = os.path.join(self.images, "image_sets/training")
         self.validation = os.path.join(self.images, "image_sets/validation")
         self.results = os.path.join(self.parent_path, "results")
-    }
+
 
 CBT2015_TRAIN = CBT2015Config("dataset/CBT2015/train")
 CBT2015_VAL = CBT2015Config("dataset/CBT2015/validation")

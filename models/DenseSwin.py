@@ -24,7 +24,7 @@ class DenseSwin(nn.Module):
         backbone: Optional[nn.Module] = None,
         density_head: Optional[nn.Module] = None,
         neck: Optional[nn.Module] = None,
-        num_class: int = 1
+        num_class: int = 1,
     ):
         super().__init__()
 
@@ -59,7 +59,8 @@ class DenseSwin(nn.Module):
         else:
             self.neck = neck
 
-        self.head = nn.Linear(linear_ch, num_class)
+        self.num_class = num_class
+        self.head = nn.Linear(linear_ch, self.num_class)
 
     def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
         # x: B, C, T, H, W
@@ -76,7 +77,7 @@ class DenseSwin(nn.Module):
 
         x = self.head(x).squeeze()
 
-        if x.shape[-1] == 1:
-            x = x.squeeze()
+        if self.num_class == 1:
+            x = x.squeeze(-1)
 
         return x, D

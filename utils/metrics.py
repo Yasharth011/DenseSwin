@@ -56,11 +56,12 @@ class GameMetrics:
         self.target_level = target_level
         self.metrics = {level: [] for level in range(self.target_level + 1)}
 
-    def update(self, pred_dens, gt_dens):
+    def update(self, predicted, gt):
 
-        for level in range(self.target_level + 1):
-            game = self._GM(pred_dens, gt_dens, level)
-            self.metrics[level].append(game)
+        for p, g in zip(predicted, gt):
+            for level in range(self.target_level + 1):
+                game = self._GM(p, g, level)
+                self.metrics[level].append(game)
 
     def compute(self):
 
@@ -73,43 +74,43 @@ class GameMetrics:
     def reset(self):
         self.metrics = {level: [] for level in range(self.target_level + 1)}
 
-    def _GM(self, pred_dens, gt_dens, level):
+    def _GM(self, predicted, gt, level):
 
         if level == 0:
-            return float(torch.abs(torch.sum(pred_dens) - torch.sum(gt_dens)))
+            return float(torch.abs(torch.sum(predicted) - torch.sum(gt)))
 
-        h, w = pred_dens.shape
+        h, w = predicted.shape[-2], predicted.shape[-1]
 
         # Handle odd dimensions
         pad_h = 1 if h % 2 != 0 else 0
         pad_w = 1 if w % 2 != 0 else 0
 
         if pad_h > 0 or pad_w > 0:
-            pred_dens = torch.nn.functional.pad(
-                pred_dens, (0, pad_w, 0, pad_h), mode="constant", value=0
+            predicted = torch.nn.functional.pad(
+                predicted, (0, pad_w, 0, pad_h), mode="constant", value=0
             )
-            gt_dens = torch.nn.functional.pad(
-                gt_dens, (0, pad_w, 0, pad_h), mode="constant", value=0
+            gt = torch.nn.functional.pad(
+                gt, (0, pad_w, 0, pad_h), mode="constant", value=0
             )
 
-        mid_h, mid_w = pred_dens.shape[0] // 2, pred_dens.shape[1] // 2
+        mid_h, mid_w = predicted.shape[0] // 2, predicted.shape[1] // 2
 
         slices_pred = [
-            pred_dens[:mid_h, :mid_w],
-            pred_dens[:mid_h, mid_w:],
-            pred_dens[mid_h:, :mid_w],
-            pred_dens[mid_h:, mid_w:],
+            predicted[:mid_h, :mid_w],
+            predicted[:mid_h, mid_w:],
+            predicted[mid_h:, :mid_w],
+            predicted[mid_h:, mid_w:],
         ]
         slices_gt = [
-            gt_dens[:mid_h, :mid_w],
-            gt_dens[:mid_h, mid_w:],
-            gt_dens[mid_h:, :mid_w],
-            gt_dens[mid_h:, mid_w:],
+            gt[:mid_h, :mid_w],
+            gt[:mid_h, mid_w:],
+            gt[mid_h:, :mid_w],
+            gt[mid_h:, mid_w:],
         ]
 
         total_error = 0.0
 
-        for p_slice, g_slice in zip(slices_pred, slices_gt):
-            total_error += self.GM(p_slice, g_slice, level - 1)
+        for pred_slice, gt_slice in zip(slices_pred, slices_gt):
+            total_error += self._GM(pred_slice, gt_slice, level - 1)
 
         return total_error

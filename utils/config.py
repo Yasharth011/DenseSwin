@@ -43,9 +43,9 @@ class TRANCOSConfig:
 
     def __post_init__(self):
         self.images = os.path.join(self.parent_path, "images")
-        self.training = os.path.join(self.images, "image_sets/training")
-        self.validation = os.path.join(self.images, "image_sets/validation")
-        self.results = os.path.join(self.parent_path, "results")
+        self.training = os.path.join(self.parent_path, "image_sets/training.txt")
+        self.validation = os.path.join(self.parent_path, "image_sets/validation.txt")
+        self.results = os.path.join(self.parent_path, "results/output_densities")
 
 
 @dataclass

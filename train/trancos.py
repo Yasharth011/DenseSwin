@@ -62,7 +62,7 @@ validation_loader = torch.utils.data.DataLoader(
     validation_set, batch_size=BATCH, shuffle=False, num_workers=4, pin_memory=True
 )
 
-model = DenseSwin(num_class=3)
+model = DenseSwin()
 model.to(device=device)
 
 # freeze decoder and linear layers

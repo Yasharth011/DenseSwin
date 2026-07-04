@@ -62,9 +62,9 @@ master_set = UCSD(UCSD_MASTER.videos, UCSD_MASTER.csv, 8, transform)
 
 CEloss = torch.nn.CrossEntropyLoss()
 
-train_metrics = val_metrics = MetricCollection(
+train_metrics = MetricCollection(
     {
-        "accuracy": Accuracy(num_classes=3, average='weighted', task="multiclass"),
+        "accuracy": Accuracy(num_classes=3, average="weighted", task="multiclass"),
         "precision": Precision(num_classes=3, average="weighted", task="multiclass"),
         "recall": Recall(num_classes=3, average="weighted", task="multiclass"),
         "f1score": F1Score(num_classes=3, average="weighted", task="multiclass"),
@@ -72,7 +72,7 @@ train_metrics = val_metrics = MetricCollection(
 )
 val_metrics = MetricCollection(
     {
-        "accuracy": Accuracy(num_classes=3, average='weighted', task="multiclass"),
+        "accuracy": Accuracy(num_classes=3, average="weighted", task="multiclass"),
         "precision": Precision(num_classes=3, average="weighted", task="multiclass"),
         "recall": Recall(num_classes=3, average="weighted", task="multiclass"),
         "f1score": F1Score(num_classes=3, average="weighted", task="multiclass"),
@@ -141,7 +141,6 @@ for fold in range(4):
                 optimizer.zero_grad()
 
                 F_ds, _ = model(frame)
-                F_ds = torch.argmax(F_ds, dim=0)
 
                 loss = CEloss(F_ds, label)
                 loss.backward()
@@ -152,6 +151,7 @@ for fold in range(4):
                 running_loss += loss.item()
                 total_loss += loss.item()
 
+                F_ds = torch.argmax(F_ds, dim=0)
                 train_metrics.update(F_ds, label)
 
                 tepoch.set_postfix(loss=loss.item())
@@ -187,12 +187,12 @@ for fold in range(4):
                     frame, label = [x.to(device) for x in data]
 
                     F_ds, _ = model(frame)
-                    F_ds = torch.argmax(F_ds, dim=1)
 
                     vloss = CEloss(F_ds, label)
 
                     running_vloss += vloss.item()
 
+                    F_ds = torch.argmax(F_ds, dim=1)
                     val_metrics.update(F_ds, label)
 
                     tepoch.set_postfix(loss=vloss.item())
@@ -249,6 +249,10 @@ for fold in range(4):
                     f"DenseSwin_UCSD_{timestamp}_fold{fold}_epoch{epoch+1}.pth",
                 ),
             )
+    # reset model weights for next fold
+    for name, layer in model.named_children():
+        if name in ["neck", "head"]:
+            layer.reset_parameters()
 
 # log hyperparams
 text = f"""

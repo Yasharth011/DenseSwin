@@ -45,7 +45,6 @@ class TRANCOSConfig:
         self.images = os.path.join(self.parent_path, "images")
         self.training = os.path.join(self.parent_path, "image_sets/training.txt")
         self.validation = os.path.join(self.parent_path, "image_sets/validation.txt")
-        self.results = os.path.join(self.parent_path, "results/output_densities")
 
 
 @dataclass

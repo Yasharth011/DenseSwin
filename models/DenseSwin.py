@@ -76,7 +76,7 @@ class DenseSwin(nn.Module):
 
         x = torch.flatten(x, 1)
 
-        x = self.head(x).squeeze()
+        x = self.head(x)
 
         if self.num_class == 1:
             x = x.squeeze(-1)

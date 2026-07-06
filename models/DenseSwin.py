@@ -21,6 +21,7 @@ class DenseSwin(nn.Module):
     def __init__(
         self,
         linear_ch: int = 96,
+        size: Optional[tuple[int, int, int]] = (8, 224, 384),
         backbone: Optional[nn.Module] = None,
         density_head: Optional[nn.Module] = None,
         neck: Optional[nn.Module] = None,
@@ -44,7 +45,7 @@ class DenseSwin(nn.Module):
             self.backbone = backbone
 
         if density_head is None:
-            self.density_head = DensityHead((8, 224, 384), [768, 512, 256])
+            self.density_head = DensityHead(size, [768, 512, 256])
         else:
             self.density_head = density_head
 

@@ -8,7 +8,10 @@ from scipy.ndimage import gaussian_filter
 import numpy as np
 from decord import VideoReader, cpu
 from torchvision import tv_tensors
-import scipy.io
+from scipy.signal import fftconvolve
+from scipy.io import loadmat
+import torch.nn.functional as F
+import torchvision.transforms.functional as TF
 
 
 class CBT2015(Dataset):
@@ -86,8 +89,9 @@ class CBT2015(Dataset):
             frame_list.append(frame)
             map_list.append(map)
 
-        frame_list = torch.stack(frame_list, dim=0).permute(1, 0, 2, 3)
-        map_list = torch.stack(map_list, dim=0).permute(1, 0, 2, 3)
+        if self.transform:
+            frame_list = torch.stack(frame_list, dim=0).permute(1, 0, 2, 3)
+            map_list = torch.stack(map_list, dim=0).permute(1, 0, 2, 3)
 
         return (frame_list, conD, map_list)
 
@@ -120,7 +124,7 @@ class UCSD(Dataset):
 
         label = self.label_map[label.strip().lower()]
 
-        vr = VideoReader(os.path.join(self.root_dir, file_name+'.avi'), ctx=cpu(0))
+        vr = VideoReader(os.path.join(self.root_dir, file_name + ".avi"), ctx=cpu(0))
 
         # skip the corrupted first frame in UCSD
         frames_batch = np.linspace(1, len(vr) - 1, num=self.num_frames, dtype=int)
@@ -131,10 +135,9 @@ class UCSD(Dataset):
 
         if self.transform:
             frames = [self.transform(frame) for frame in frames]
+            frames = torch.stack(frames, dim=0).permute(1, 0, 2, 3)
 
-        tensor = torch.stack(frames, dim=0).permute(1, 0, 2, 3)
-
-        return (tensor, label)
+        return (frames, label)
 
     def get_subset(self, path, fold=0):
 
@@ -144,41 +147,79 @@ class UCSD(Dataset):
 
         return indices
 
+
 class TRANCOS(Dataset):
     """Dataset Loader for TRANCOS"""
 
-    def __init__(self, frame_dir, gt_path, csv_path, transform=None):
-        self.frame_dir = frame_dir
-        self.gt_path = gt_path
+    def __init__(self, root_dir, csv_path, target_size=None):
+        self.root_dir = root_dir
         self.csv = pd.read_csv(csv_path, header=None)
-        self.transform = transform
+        self.target_size = target_size
 
     def __len__(self):
         return len(self.csv)
 
+    def _getmap(self, path: str, kernel_size: int = 90, sigma: float = 15.0):
+
+        dots = np.array(Image.open(path))
+        red_channel = dots[:, :, 0].astype(np.float64) / 255.0
+
+        radius = (kernel_size - 1) / 2.0
+        y, x = np.mgrid[-radius : radius + 1, -radius : radius + 1]
+        kernel = np.exp(-(x**2 + y**2) / (2.0 * sigma**2))
+        kernel[kernel < np.finfo(kernel.dtype).eps * kernel.max()] = 0
+        total = kernel.sum()
+        if total != 0:
+            kernel /= total
+
+        map = fftconvolve(red_channel, kernel, mode="same")
+
+        return map
 
     def __getitem__(self, idx):
 
         if torch.is_tensor(idx):
             idx = idx.tolist()
-        
-        frame_path = os.path.join(self.frame_dir, self.csv.iloc[idx])
 
-        frame = Image.open(frame_path)
+        file_name = os.path.splitext(self.csv.iloc[idx, 0])[0]
 
-        gt_path = scipy.io.loadmat(os.path.join(self.gt_path, os.path.splitext(frame_path)[0] + '.mat'))
+        frame = Image.open(os.path.join(self.root_dir, (file_name + ".jpg")))
+        map = self._getmap(os.path.join(self.root_dir, (file_name + "dots.png")))
+        roi = loadmat(os.path.join(self.root_dir, (file_name + "mask.mat")))[
+            "BW"
+        ].astype(np.float64)
 
-        gt = gt_path['gt']
-        roi = gt_path['estDensity_ROI']
+        h, w = map.shape
+        roi = roi[:h, :w]
 
-        if self.transform:
-            frame = self.transform(frame)
-            gt = self.transform(gt)
-            roi = self.transform(roi)
+        frame = TF.to_tensor(frame)
+        frame = TF.normalize(
+            frame, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+        )
+        map = torch.from_numpy(map).float()
+        roi = torch.from_numpy(roi).float()
 
-            # add temporal dim
-            frame = frame.unsqueeze(1)
-            gt = gt.unsqueeze(1)
-            roi = roi.unsqueeze(1)
+        if self.target_size:
+            frame = frame.unsqueeze(0)
+            frame = F.interpolate(
+                frame, size=self.target_size, mode="bilinear", align_corners=False
+            )
+            frame = frame.squeeze(0)
+            frame = torch.stack([frame] * 8, dim=0).permute(1, 0, 2, 3)
 
-        return frame, gt, roi
+            # resize map and form 5D tensor
+            map = map.unsqueeze(0).unsqueeze(0)
+            map = F.interpolate(
+                map, size=self.target_size, mode="bilinear", align_corners=False
+            )
+            map = map.squeeze(0)
+            map = (map / map.sum()) / len(self.csv)
+            map = torch.stack([map] * 8, dim=0).permute(1, 0, 2, 3)
+
+            # resize roi mask
+            roi = roi.unsqueeze(0).unsqueeze(0)
+            roi = F.interpolate(roi, size=self.target_size, mode="nearest")
+            roi = roi.squeeze(0)
+            roi = torch.stack([roi] * 8, dim=0).permute(1, 0, 2, 3)
+
+        return frame, map, roi

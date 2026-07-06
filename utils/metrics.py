@@ -77,7 +77,9 @@ class GameMetrics:
     def _GM(self, predicted, gt, level):
 
         if level == 0:
-            return float(torch.abs(torch.sum(predicted) - torch.sum(gt)))
+            return float(
+                torch.abs(torch.sum(predicted.detach()) - torch.sum(gt.detach()))
+            )
 
         h, w = predicted.shape[-2], predicted.shape[-1]
 
@@ -93,19 +95,19 @@ class GameMetrics:
                 gt, (0, pad_w, 0, pad_h), mode="constant", value=0
             )
 
-        mid_h, mid_w = predicted.shape[0] // 2, predicted.shape[1] // 2
+        mid_h, mid_w = predicted.shape[-2] // 2, predicted.shape[-1] // 2
 
         slices_pred = [
-            predicted[:mid_h, :mid_w],
-            predicted[:mid_h, mid_w:],
-            predicted[mid_h:, :mid_w],
-            predicted[mid_h:, mid_w:],
+            predicted[..., :mid_h, :mid_w],
+            predicted[..., :mid_h, mid_w:],
+            predicted[..., mid_h:, :mid_w],
+            predicted[..., mid_h:, mid_w:],
         ]
         slices_gt = [
-            gt[:mid_h, :mid_w],
-            gt[:mid_h, mid_w:],
-            gt[mid_h:, :mid_w],
-            gt[mid_h:, mid_w:],
+            gt[..., :mid_h, :mid_w],
+            gt[..., :mid_h, mid_w:],
+            gt[..., mid_h:, :mid_w],
+            gt[..., mid_h:, mid_w:],
         ]
 
         total_error = 0.0

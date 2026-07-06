@@ -33,26 +33,16 @@ LR_B = float(args.learning_rate_backbone)
 LR = float(args.learning_rate)
 DECAY = float(args.decay)
 
-transform = v2.Compose(
-    [
-        v2.Resize((224, 384)),
-        v2.ToImage(),
-        v2.ToDtype(dtype=torch.float32, scale=True),
-        v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ]
-)
-
+TARGET_SIZE = (224, 384)
 training_set = TRANCOS(
     TRANCOS_MASTER.images,
-    TRANCOS_MASTER.results,
     TRANCOS_MASTER.training,
-    transform=transform,
+    target_size=TARGET_SIZE,
 )
 validation_set = TRANCOS(
     TRANCOS_MASTER.images,
-    TRANCOS_MASTER.results,
     TRANCOS_MASTER.validation,
-    transform=transform,
+    target_size=TARGET_SIZE,
 )
 
 training_loader = torch.utils.data.DataLoader(
@@ -121,8 +111,8 @@ for epoch in range(EPOCHS):
 
             _, D = model(frame)
 
-            D = D*roi
-            map = map*roi
+            D = D * roi
+            map = map * roi
 
             loss = D_loss(D, map)
             loss.backward()

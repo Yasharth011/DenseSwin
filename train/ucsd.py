@@ -32,7 +32,7 @@ args = parser.parse_args()
 
 EPOCHS = int(args.epochs)
 BATCH = int(args.batch)
-CHECKPOINT = args.checkpoint
+CHECKPOINT = str(args.checkpoint)
 LR = float(args.learning_rate)
 DECAY = float(args.decay)
 
@@ -45,19 +45,6 @@ transform = v2.Compose(
     ]
 )
 
-checkpoint = torch.load(
-    os.path.join(MODEL_CONFIG.checkpoints, args.checkpoint), weights_only=True
-)
-model = DenseSwin(num_class=3)
-model.load_state_dict(checkpoint)
-model.to(device=device)
-
-# freeze back and density head
-for name, layer in model.named_children():
-    if name in ["backbone", "density_head"]:
-        for param in layer.parameters():
-            param.requires_grad = False
-
 master_set = UCSD(UCSD_MASTER.videos, UCSD_MASTER.csv, 8, transform)
 
 CEloss = torch.nn.CrossEntropyLoss()
@@ -69,7 +56,7 @@ train_metrics = MetricCollection(
         "recall": Recall(num_classes=3, average="weighted", task="multiclass"),
         "f1score": F1Score(num_classes=3, average="weighted", task="multiclass"),
     }
-)
+).to(device)
 val_metrics = MetricCollection(
     {
         "accuracy": Accuracy(num_classes=3, average="weighted", task="multiclass"),
@@ -77,7 +64,7 @@ val_metrics = MetricCollection(
         "recall": Recall(num_classes=3, average="weighted", task="multiclass"),
         "f1score": F1Score(num_classes=3, average="weighted", task="multiclass"),
     }
-)
+).to(device)
 
 timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
 writer = SummaryWriter(
@@ -88,6 +75,19 @@ writer = SummaryWriter(
 for fold in range(4):
 
     print(f"FOLD {fold} : ")
+
+    checkpoint = torch.load(
+        os.path.join(MODEL_CONFIG.checkpoints, CHECKPOINT), weights_only=True
+    )
+    model = DenseSwin(num_class=3)
+    model.load_state_dict(checkpoint)
+    model.to(device=device)
+
+    # freeze back and density head
+    for name, layer in model.named_children():
+        if name in ["backbone", "density_head"]:
+            for param in layer.parameters():
+                param.requires_grad = False
 
     training_set = torch.utils.data.Subset(
         master_set, master_set.get_subset(UCSD_MASTER.train_csv, fold)
@@ -151,7 +151,7 @@ for fold in range(4):
                 running_loss += loss.item()
                 total_loss += loss.item()
 
-                F_ds = torch.argmax(F_ds, dim=0)
+                F_ds = torch.argmax(F_ds, dim=1)
                 train_metrics.update(F_ds, label)
 
                 tepoch.set_postfix(loss=loss.item())
@@ -249,10 +249,9 @@ for fold in range(4):
                     f"DenseSwin_UCSD_{timestamp}_fold{fold}_epoch{epoch+1}.pth",
                 ),
             )
-    # reset model weights for next fold
-    for name, layer in model.named_children():
-        if name in ["neck", "head"]:
-            layer.reset_parameters()
+    # reset model for next fold
+    del model, optimizer, scheduler
+    torch.cuda.empty_cache()
 
 # log hyperparams
 text = f"""

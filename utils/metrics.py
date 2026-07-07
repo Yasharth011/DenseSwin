@@ -54,25 +54,25 @@ class GameMetrics:
 
     def __init__(self, target_level=3):
         self.target_level = target_level
-        self.metrics = {level: [] for level in range(self.target_level + 1)}
+        self.metrics = {f"{level}": [] for level in range(self.target_level + 1)}
 
     def update(self, predicted, gt):
 
         for p, g in zip(predicted, gt):
             for level in range(self.target_level + 1):
                 game = self._GM(p, g, level)
-                self.metrics[level].append(game)
+                self.metrics[f"{level}"].append(game)
 
     def compute(self):
 
         avg_game = {}
         for level, error in self.metrics.items():
-            avg_game[level] = sum(error) / len(error)
+            avg_game[f"{level}"] = sum(error) / len(error)
 
         return avg_game
 
     def reset(self):
-        self.metrics = {level: [] for level in range(self.target_level + 1)}
+        self.metrics = {f"{level}": [] for level in range(self.target_level + 1)}
 
     def _GM(self, predicted, gt, level):
 

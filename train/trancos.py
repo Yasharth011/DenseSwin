@@ -83,7 +83,7 @@ scheduler = OneCycleLR(
 
 timestamp = datetime.now().strftime("%d-%m-%Y_%H:%M:%S")
 writer = SummaryWriter(
-    os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_CBT2015_{timestamp}")
+    os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_TRANCOS_{timestamp}")
 )
 
 best_vloss = float("inf")
@@ -203,7 +203,7 @@ for epoch in range(EPOCHS):
             model.state_dict(),
             os.path.join(
                 MODEL_CONFIG.checkpoints,
-                f"DenseSwin_CBT2015_{timestamp}_epoch{epoch+1}.pth",
+                f"DenseSwin_TRANCOS_{timestamp}_epoch{epoch+1}.pth",
             ),
         )
 

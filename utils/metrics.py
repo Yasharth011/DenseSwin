@@ -67,7 +67,7 @@ class GameMetrics:
 
         avg_game = {}
         for level, error in self.metrics.items():
-            avg_game[f"{level}"] = sum(error) / len(error)
+            avg_game[f"{level}"] = sum(error) / len(error) if error else 0.0
 
         return avg_game
 

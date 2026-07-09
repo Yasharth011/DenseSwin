@@ -8,6 +8,7 @@ from scipy.ndimage import gaussian_filter
 import numpy as np
 from decord import VideoReader, cpu
 from torchvision import tv_tensors
+from torchvision.transforms import v2
 from scipy.signal import fftconvolve
 from scipy.io import loadmat
 import torch.nn.functional as F
@@ -149,12 +150,51 @@ class UCSD(Dataset):
 
 
 class TRANCOS(Dataset):
-    """Dataset Loader for TRANCOS"""
+    """Dataset Loader for TRANCOS.
 
-    def __init__(self, root_dir, csv_path, target_size=None):
+    Each item is ``(frame, density, roi, count)``:
+        frame   -- (3, T, H, W) normalised clip, the still image repeated T times
+        density -- (1, H, W) ROI-masked density map that sums to ``count``
+        roi     -- (1, H, W) binary region-of-interest mask
+        count   -- scalar, the number of vehicles inside the ROI
+
+    The density map stays in true vehicle units, so GAME-0 computed against it
+    is the absolute count error and is directly comparable to published TRANCOS
+    numbers.
+    """
+
+    IMAGENET_MEAN = [0.485, 0.456, 0.406]
+    IMAGENET_STD = [0.229, 0.224, 0.225]
+
+    # bump whenever _targets changes, so stale .npz files are not reused
+    CACHE_VERSION = 2
+
+    def __init__(
+        self,
+        root_dir,
+        csv_path,
+        target_size=None,
+        num_frames=8,
+        augment=False,
+        min_crop=0.75,
+        cache_dir=None,
+    ):
         self.root_dir = root_dir
         self.csv = pd.read_csv(csv_path, header=None)
         self.target_size = target_size
+        self.num_frames = num_frames
+        self.augment = augment
+        self.min_crop = min_crop
+        self.cache_dir = cache_dir
+
+        if cache_dir:
+            os.makedirs(cache_dir, exist_ok=True)
+
+        self.jitter = (
+            v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2)
+            if augment
+            else None
+        )
 
     def __len__(self):
         return len(self.csv)
@@ -176,6 +216,81 @@ class TRANCOS(Dataset):
 
         return map
 
+    def _targets(self, file_name):
+        """Full-resolution ROI-masked density map and mask, cached on disk.
+
+        The 90x90 FFT convolution and the .mat read cost more than the forward
+        pass at small batch sizes, and neither depends on the epoch.
+        """
+        cache = (
+            os.path.join(self.cache_dir, f"{file_name}.v{self.CACHE_VERSION}.npz")
+            if self.cache_dir
+            else None
+        )
+        if cache and os.path.exists(cache):
+            with np.load(cache) as stored:
+                return stored["density"], stored["roi"].astype(np.float32)
+
+        dots_path = os.path.join(self.root_dir, file_name + "dots.png")
+        density = self._getmap(dots_path)
+        roi = loadmat(os.path.join(self.root_dir, file_name + "mask.mat"))["BW"]
+
+        h, w = density.shape
+        roi = roi[:h, :w].astype(np.float32)
+
+        # the TRANCOS protocol counts vehicles inside the ROI only
+        density = density * roi
+
+        # Convolving with 'same' and then masking sheds 2-6% of the Gaussian
+        # mass over the image border and the ROI edge. Left alone that biases
+        # every target low by up to ~2 vehicles, which is the size of the metric
+        # we are trying to report. Rescale so the map sums to the exact number
+        # of annotated dots inside the ROI.
+        dots = np.array(Image.open(dots_path))[:h, :w, 0] > 128
+        n_dots = float((dots & (roi > 0)).sum())
+        total = density.sum()
+        if total > 0:
+            density = density * (n_dots / total)
+
+        density = density.astype(np.float32)
+
+        if cache:
+            # the map is mostly zeros and the mask is binary, so this is ~10x
+            # smaller than a raw float32 dump of both
+            tmp = f"{cache}.{os.getpid()}.tmp"
+            with open(tmp, "wb") as fh:
+                np.savez_compressed(fh, density=density, roi=roi.astype(bool))
+            os.replace(tmp, cache)
+
+        return density, roi
+
+    def _resize(self, x, mode):
+        kwargs = {"align_corners": False} if mode != "nearest" else {}
+        return F.interpolate(
+            x.unsqueeze(0), size=self.target_size, mode=mode, **kwargs
+        ).squeeze(0)
+
+    def _augment(self, frame, density, roi):
+
+        if torch.rand(()) < 0.5:
+            frame, density, roi = (
+                torch.flip(t, dims=[-1]) for t in (frame, density, roi)
+            )
+
+        h, w = density.shape[-2:]
+        for _ in range(10):
+            scale = self.min_crop + torch.rand(()).item() * (1.0 - self.min_crop)
+            ch, cw = max(1, int(h * scale)), max(1, int(w * scale))
+            top = int(torch.randint(0, h - ch + 1, ()))
+            left = int(torch.randint(0, w - cw + 1, ()))
+            window = (..., slice(top, top + ch), slice(left, left + cw))
+            # a crop that misses the ROI entirely carries no supervision
+            if roi[window].sum() > 0:
+                frame, density, roi = frame[window], density[window], roi[window]
+                break
+
+        return self.jitter(frame), density, roi
+
     def __getitem__(self, idx):
 
         if torch.is_tensor(idx):
@@ -183,43 +298,34 @@ class TRANCOS(Dataset):
 
         file_name = os.path.splitext(self.csv.iloc[idx, 0])[0]
 
-        frame = Image.open(os.path.join(self.root_dir, (file_name + ".jpg")))
-        map = self._getmap(os.path.join(self.root_dir, (file_name + "dots.png")))
-        roi = loadmat(os.path.join(self.root_dir, (file_name + "mask.mat")))[
-            "BW"
-        ].astype(np.float64)
-
-        h, w = map.shape
-        roi = roi[:h, :w]
+        frame = Image.open(os.path.join(self.root_dir, file_name + ".jpg")).convert(
+            "RGB"
+        )
+        density, roi = self._targets(file_name)
 
         frame = TF.to_tensor(frame)
-        frame = TF.normalize(
-            frame, mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
-        )
-        map = torch.from_numpy(map).float()
-        roi = torch.from_numpy(roi).float()
+        density = torch.from_numpy(density).unsqueeze(0)
+        roi = torch.from_numpy(roi).unsqueeze(0)
+
+        if self.augment:
+            frame, density, roi = self._augment(frame, density, roi)
+
+        # measured after cropping, so it reflects the vehicles actually visible
+        count = density.sum()
+
+        frame = TF.normalize(frame, mean=self.IMAGENET_MEAN, std=self.IMAGENET_STD)
 
         if self.target_size:
-            frame = frame.unsqueeze(0)
-            frame = F.interpolate(
-                frame, size=self.target_size, mode="bilinear", align_corners=False
-            )
-            frame = frame.squeeze(0)
-            frame = torch.stack([frame] * 8, dim=0).permute(1, 0, 2, 3)
+            frame = self._resize(frame, "bilinear")
+            density = self._resize(density, "bilinear")
+            roi = self._resize(roi, "nearest")
 
-            # resize map and form 5D tensor
-            map = map.unsqueeze(0).unsqueeze(0)
-            map = F.interpolate(
-                map, size=self.target_size, mode="bilinear", align_corners=False
-            )
-            map = map.squeeze(0)
-            map = (map / map.sum()) / len(self.csv)
-            map = torch.stack([map] * 8, dim=0).permute(1, 0, 2, 3)
+        # resampling does not conserve mass -- restore the true count
+        density = density * roi
+        total = density.sum()
+        if total > 0:
+            density = density * (count / total)
 
-            # resize roi mask
-            roi = roi.unsqueeze(0).unsqueeze(0)
-            roi = F.interpolate(roi, size=self.target_size, mode="nearest")
-            roi = roi.squeeze(0)
-            roi = torch.stack([roi] * 8, dim=0).permute(1, 0, 2, 3)
+        frame = frame.unsqueeze(1).expand(-1, self.num_frames, -1, -1).contiguous()
 
-        return frame, map, roi
+        return frame, density, roi, count

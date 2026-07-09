@@ -63,12 +63,19 @@ class DenseSwin(nn.Module):
         self.num_class = num_class
         self.head = nn.Linear(linear_ch, self.num_class)
 
-    def forward(self, x: Tensor) -> tuple[Tensor, Tensor]:
+    def forward(
+        self, x: Tensor, density_only: bool = False
+    ) -> tuple[Optional[Tensor], Tensor]:
         # x: B, C, T, H, W
 
         x = self.backbone(x)
 
-        F_dm, D = self.density_head(x)
+        F_dm, D = self.density_head(x, density_only=density_only)
+
+        # D branches off before the neck, so a density-only objective gives
+        # neck/head/conv_align no gradient -- running them would be dead compute.
+        if density_only:
+            return None, D
 
         x = self.neck(x + F_dm)
 

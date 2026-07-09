@@ -21,7 +21,7 @@ class UCSDConfig:
     parent_path: str
 
     videos: str = field(init=False)
-    master_csv: str = field(init=False)
+    csv: str = field(init=False)
     train_csv: str = field(init=False)
     test_csv: str = field(init=False)
 
@@ -39,12 +39,21 @@ class TRANCOSConfig:
     images: str = field(init=False)
     training: str = field(init=False)
     validation: str = field(init=False)
-    results: str = field(init=False)
+    trainval: str = field(init=False)
+    test: str = field(init=False)
+    cache: str = field(init=False)
 
     def __post_init__(self):
         self.images = os.path.join(self.parent_path, "images")
-        self.training = os.path.join(self.parent_path, "image_sets/training.txt")
-        self.validation = os.path.join(self.parent_path, "image_sets/validation.txt")
+        image_sets = os.path.join(self.parent_path, "image_sets")
+        self.training = os.path.join(image_sets, "training.txt")
+        self.validation = os.path.join(image_sets, "validation.txt")
+        self.trainval = os.path.join(image_sets, "trainval.txt")
+        self.test = os.path.join(image_sets, "test.txt")
+        self.cache = os.path.join(self.parent_path, "cache")
+
+    def split(self, name: str) -> str:
+        return getattr(self, name)
 
 
 @dataclass

@@ -72,8 +72,6 @@ class DenseSwin(nn.Module):
 
         F_dm, D = self.density_head(x, density_only=density_only)
 
-        # D branches off before the neck, so a density-only objective gives
-        # neck/head/conv_align no gradient -- running them would be dead compute.
         if density_only:
             return None, D
 

@@ -39,11 +39,6 @@ DECAY = float(args.decay)
 checkpoint = torch.load(
     os.path.join(MODEL_CONFIG.checkpoints, CHECKPOINT), weights_only=True
 )
-filtered_checkpoint = {
-    key: value
-    for key, value in checkpoint.items()
-    if key.startswith("backbone.") or key.startswith("density_head.")
-}
 
 transform = v2.Compose(
     [
@@ -86,7 +81,7 @@ for fold in range(4):
     print(f"FOLD {fold} : ")
 
     model = DenseSwin(num_class=3)
-    model.load_state_dict(filtered_checkpoint, strict=False)
+    model.load_state_dict(checkpoint, strict=False)
     model.to(device=device)
 
     # freeze back and density head

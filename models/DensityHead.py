@@ -104,15 +104,9 @@ class DensityHead(nn.Module):
 
         self.conv_align = layer(ch_dims[-1], ch_dims[0])
 
-        # the ReLU moved after the upsample, but stay an nn.Sequential so the
-        # state_dict keys still match checkpoints trained before that change
         self.density_head = nn.Sequential(nn.Conv3d(ch_dims[-1], 1, kernel_size=1))
         self.density_act = nn.ReLU()
 
-        # A density map has a tiny mean, so a default-initialised projection
-        # overshoots the target by orders of magnitude. MSE then drives every
-        # pre-activation below zero and the output ReLU stops passing gradient.
-        # Start near zero and let the model grow into the target from below.
         nn.init.normal_(self.density_head[0].weight, std=0.01)
         nn.init.zeros_(self.density_head[0].bias)
 
@@ -124,10 +118,6 @@ class DensityHead(nn.Module):
         F_dm: Tensor = self.conv_block(x)
         F_dm = self.pooling_layer(F_dm)
 
-        # A 1x1 convolution and trilinear interpolation are both linear and
-        # commute, so projecting to one channel before upsampling is exactly
-        # equivalent to upsampling all ch_dims[-1] channels first -- and it
-        # avoids materialising a (B, 256, *size) tensor.
         D = self.density_head(F_dm)
         D = F.interpolate(D, size=self.size, mode="trilinear", align_corners=False)
         D = self.density_act(D)

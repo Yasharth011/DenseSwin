@@ -238,14 +238,8 @@ class TRANCOS(Dataset):
         h, w = density.shape
         roi = roi[:h, :w].astype(np.float32)
 
-        # the TRANCOS protocol counts vehicles inside the ROI only
         density = density * roi
 
-        # Convolving with 'same' and then masking sheds 2-6% of the Gaussian
-        # mass over the image border and the ROI edge. Left alone that biases
-        # every target low by up to ~2 vehicles, which is the size of the metric
-        # we are trying to report. Rescale so the map sums to the exact number
-        # of annotated dots inside the ROI.
         dots = np.array(Image.open(dots_path))[:h, :w, 0] > 128
         n_dots = float((dots & (roi > 0)).sum())
         total = density.sum()
@@ -255,8 +249,6 @@ class TRANCOS(Dataset):
         density = density.astype(np.float32)
 
         if cache:
-            # the map is mostly zeros and the mask is binary, so this is ~10x
-            # smaller than a raw float32 dump of both
             tmp = f"{cache}.{os.getpid()}.tmp"
             with open(tmp, "wb") as fh:
                 np.savez_compressed(fh, density=density, roi=roi.astype(bool))

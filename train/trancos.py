@@ -12,6 +12,8 @@ from tqdm import tqdm
 from models import DenseSwin
 from utils import MODEL_CONFIG, TRANCOS, TRANCOS_MASTER, EarlyStopper, GameMetrics
 
+device = "cuda:0" if torch.cuda.is_available() else "cpu"
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-e", "--epochs", type=int, default=100, help="number of epochs")
 parser.add_argument("-b", "--batch", type=int, default=4, help="data batch size")
@@ -57,16 +59,9 @@ parser.add_argument(
     choices=["training", "trainval"],
     help="'trainval' is the standard protocol when reporting on the test split",
 )
-parser.add_argument("--resume", default=None, help="checkpoint to resume from")
 args = parser.parse_args()
 
 TARGET_SIZE = (224, 384)
-device = "cuda:0" if torch.cuda.is_available() else "cpu"
-
-# A full-resolution density map averages ~4e-4 per pixel. Asked to regress that
-# directly, the head is pushed to zero, the output ReLU saturates and training
-# dies. Regressing `density * SCALE` keeps the target in the same range as the
-# activations. Counts and GAME are always reported in true vehicle units.
 SCALE = args.density_scale
 
 
@@ -80,30 +75,11 @@ def seed_everything(seed):
 seed_everything(args.seed)
 torch.backends.cudnn.benchmark = True
 
-# bfloat16 has the dynamic range to hold a sum-reduced loss; fp16 does not
 use_amp = (
     not args.no_amp and device.startswith("cuda") and torch.cuda.is_bf16_supported()
 )
 if not args.no_amp and not use_amp:
     print("bfloat16 unsupported on this device, running in fp32")
-
-
-resume_ckpt = None
-if args.resume:
-    resume_ckpt = torch.load(args.resume, map_location="cpu", weights_only=True)
-    saved = resume_ckpt["args"]
-    # OneCycleLR bakes total_steps into its state_dict, so a run resumed under a
-    # different schedule length overruns it partway through the next epoch
-    mismatch = {
-        k: (saved.get(k), getattr(args, k))
-        for k in ("epochs", "batch", "train_split")
-        if saved.get(k) != getattr(args, k)
-    }
-    if mismatch:
-        raise SystemExit(
-            "--resume needs the same LR schedule as the original run; differs in: "
-            + ", ".join(f"{k}: {was} -> {now}" for k, (was, now) in mismatch.items())
-        )
 
 
 def build_set(split, augment):
@@ -136,9 +112,6 @@ test_loader = build_loader(build_set("test", False), False)
 
 model = DenseSwin(size=(args.frames, *TARGET_SIZE)).to(device)
 
-# Only the backbone and the density head lie on the gradient path of D.
-# The neck/head are skipped entirely via density_only=True, and train/ucsd.py
-# only ever restores backbone.* and density_head.* from these checkpoints.
 params = [
     {"params": model.backbone.parameters(), "lr": args.learning_rate_backbone},
     {"params": model.density_head.parameters(), "lr": args.learning_rate},
@@ -165,23 +138,21 @@ timestamp = datetime.now().strftime("%d-%m-%Y_%H-%M-%S")
 writer = SummaryWriter(
     os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_TRANCOS_{timestamp}")
 )
-writer.add_text("Hyperparameters", "\n".join(f"**{k}**: {v}" for k, v in vars(args).items()))
+writer.add_text(
+    "Hyperparameters", "\n".join(f"**{k}**: {v}" for k, v in vars(args).items())
+)
 writer.flush()
 
 os.makedirs(MODEL_CONFIG.checkpoints, exist_ok=True)
-best_path = os.path.join(MODEL_CONFIG.checkpoints, f"DenseSwin_TRANCOS_{timestamp}_best.pth")
-last_path = os.path.join(MODEL_CONFIG.checkpoints, f"DenseSwin_TRANCOS_{timestamp}_last.pth")
+best_path = os.path.join(
+    MODEL_CONFIG.checkpoints, f"DenseSwin_TRANCOS_{timestamp}_best.pth"
+)
+last_path = os.path.join(
+    MODEL_CONFIG.checkpoints, f"DenseSwin_TRANCOS_{timestamp}_last.pth"
+)
 
 best_game0 = float("inf")
 start_epoch = 0
-
-if resume_ckpt:
-    model.load_state_dict(resume_ckpt["model"])
-    optimizer.load_state_dict(resume_ckpt["optimizer"])
-    scheduler.load_state_dict(resume_ckpt["scheduler"])
-    best_game0 = resume_ckpt["best_game0"]
-    start_epoch = resume_ckpt["epoch"]
-    print(f"resumed from {args.resume} at epoch {start_epoch}")
 
 
 def predict(frame, roi):
@@ -241,43 +212,30 @@ for epoch in range(start_epoch, args.epochs):
     train_game = train_metrics.compute()
     val_game = val_metrics.compute()
 
-    writer.add_scalars("Loss", {"Training": avg_loss, "Validation": avg_vloss}, epoch + 1)
+    writer.add_scalars(
+        "Loss", {"Training": avg_loss, "Validation": avg_vloss}, epoch + 1
+    )
     writer.add_scalars("Game/Train", train_game, epoch + 1)
     writer.add_scalars("Game/Validation", val_game, epoch + 1)
-    writer.add_scalar("GradNorm", grad_norm, epoch + 1)
-    for i, group in enumerate(optimizer.param_groups):
-        writer.add_scalar(f"LR/group_{i}", group["lr"], epoch + 1)
     writer.flush()
 
     train_metrics.reset()
     val_metrics.reset()
 
     game0 = val_game["0"]
-    print(
-        f"epoch {epoch+1}: loss={avg_loss:.4f} vloss={avg_vloss:.4f} "
-        f"train GAME-0={train_game['0']:.3f} val GAME-0={game0:.3f} |g|={grad_norm:.2f}"
-    )
 
-    meta = {"epoch": epoch + 1, "best_game0": min(best_game0, game0), "args": vars(args)}
+    meta = {
+        "epoch": epoch + 1,
+        "best_game0": min(best_game0, game0),
+        "args": vars(args),
+    }
 
-    # only `last` carries the optimiser moments needed to resume; `best` is the
-    # artifact you transfer or deploy, and stays half the size without them
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict(),
-            **meta,
-        },
-        last_path,
-    )
+    torch.save(model.state_dict(), best_path)
 
-    # GAME-0 is the reported metric, so select on it rather than on the loss
     if game0 < best_game0:
         best_game0 = game0
-        torch.save({"model": model.state_dict(), **meta}, best_path)
+        torch.save(model.state_dict(), best_path)
 
-    # stop on the metric we select on, not on the loss
     if stopper and stopper.early_stop(game0):
         print(f"early stopping at epoch {epoch+1}")
         break
@@ -302,6 +260,3 @@ writer.add_text(
 )
 writer.flush()
 writer.close()
-
-print(f"best val GAME-0: {best_game0:.3f}")
-print("test: " + "  ".join(f"GAME-{lvl}={err:.3f}" for lvl, err in test_game.items()))

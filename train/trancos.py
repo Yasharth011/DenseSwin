@@ -1,14 +1,10 @@
 import argparse
 import os
-import random
 from datetime import datetime
-
-import numpy as np
 import torch
 from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
-
 from models import DenseSwin
 from utils import MODEL_CONFIG, TRANCOS, TRANCOS_MASTER, EarlyStopper, GameMetrics
 
@@ -48,9 +44,7 @@ parser.add_argument(
 )
 parser.add_argument("-f", "--frames", type=int, default=8, help="temporal clip length")
 parser.add_argument("-w", "--workers", type=int, default=4, help="dataloader workers")
-parser.add_argument("--clip", type=float, default=1.0, help="gradient norm clip")
 parser.add_argument("--patience", type=int, default=15, help="early stopping patience")
-parser.add_argument("--seed", type=int, default=42)
 parser.add_argument("--no_amp", action="store_true", help="disable bfloat16 autocast")
 parser.add_argument("--no_augment", action="store_true", help="disable augmentation")
 parser.add_argument(
@@ -64,15 +58,6 @@ args = parser.parse_args()
 TARGET_SIZE = (224, 384)
 SCALE = args.density_scale
 
-
-def seed_everything(seed):
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-
-
-seed_everything(args.seed)
 torch.backends.cudnn.benchmark = True
 
 use_amp = (
@@ -165,7 +150,6 @@ def predict(frame, roi):
 def run_epoch(loader, metrics, train, desc):
     model.train(train)
     total = 0.0
-    grad_norm = 0.0
 
     with torch.set_grad_enabled(train), tqdm(loader, desc=desc) as bar:
         for frame, density, roi, count in bar:
@@ -187,8 +171,6 @@ def run_epoch(loader, metrics, train, desc):
 
             if train:
                 loss.backward()
-                norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip)
-                grad_norm += norm.item()
                 optimizer.step()
                 scheduler.step()
 
@@ -196,15 +178,15 @@ def run_epoch(loader, metrics, train, desc):
             metrics.update(D.detach() / SCALE, density)
             bar.set_postfix(loss=loss.item())
 
-    return total / len(loader), grad_norm / len(loader)
+    return total / len(loader)
 
 
 for epoch in range(start_epoch, args.epochs):
 
-    avg_loss, grad_norm = run_epoch(
+    avg_loss = run_epoch(
         training_loader, train_metrics, True, f"Training Epoch {epoch+1}"
     )
-    avg_vloss, _ = run_epoch(
+    avg_vloss = run_epoch(
         validation_loader, val_metrics, False, f"Validation Epoch {epoch+1}"
     )
 
@@ -222,12 +204,6 @@ for epoch in range(start_epoch, args.epochs):
     val_metrics.reset()
 
     game0 = val_game["0"]
-
-    meta = {
-        "epoch": epoch + 1,
-        "best_game0": min(best_game0, game0),
-        "args": vars(args),
-    }
 
     torch.save(model.state_dict(), best_path)
 

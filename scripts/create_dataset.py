@@ -4,7 +4,7 @@ import pandas as pd
 import torch
 from PIL import Image, ImageDraw
 from ultralytics.models import YOLO
-from utils import TEST_DATASET, TRAIN_DATASET
+from utils import CBT2015_TRAIN, CBT2015_VAL
 from decord import VideoReader
 from decord import cpu
 import json
@@ -196,7 +196,7 @@ if __name__ == "__main__":
 
     if args.dataset == "train":
         create_dataset(
-            dataset=TRAIN_DATASET,
+            dataset=CBT2015_TRAIN,
             BATCH_SIZE=int(args.batch),
             num_frames=int(args.num_frames),
             annotate=args.annotate,
@@ -204,7 +204,7 @@ if __name__ == "__main__":
         )
     elif args.dataset == "test":
         create_dataset(
-            dataset=TEST_DATASET,
+            dataset=CBT2015_VAL,
             BATCH_SIZE=int(args.batch),
             num_frames=int(args.num_frames),
             annotate=args.annotate,

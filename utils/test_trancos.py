@@ -23,7 +23,11 @@ parser.add_argument(
     default=1000.0,
     help="the network regresses density * this factor; see the note in the loss",
 )
+parser.add_argument("-b", "--batch", type=int, default=4, help="data batch size")
+parser.add_argument("-f", "--frames", type=int, default=8, help="temporal clip length")
+parser.add_argument("-w", "--workers", type=int, default=4, help="dataloader workers")
 parser.add_argument("--seed", type=int, default=42)
+parser.add_argument("--no_amp", action="store_true", help="disable bfloat16 autocast")
 args = parser.parse_args()
 
 TARGET_SIZE = (224, 384)

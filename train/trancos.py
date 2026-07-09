@@ -108,7 +108,6 @@ def build_loader(dataset, shuffle):
 
 training_loader = build_loader(build_set(args.train_split, not args.no_augment), True)
 validation_loader = build_loader(build_set("validation", False), False)
-test_loader = build_loader(build_set("test", False), False)
 
 model = DenseSwin(size=(args.frames, *TARGET_SIZE)).to(device)
 
@@ -239,24 +238,4 @@ for epoch in range(start_epoch, args.epochs):
     if stopper and stopper.early_stop(game0):
         print(f"early stopping at epoch {epoch+1}")
         break
-
-"""
-TEST -- run once, on the best checkpoint, against the held-out split
-"""
-if os.path.exists(best_path):
-    best = torch.load(best_path, map_location=device, weights_only=True)
-    model.load_state_dict(best["model"])
-else:
-    # resumed at or past the final epoch, so this run never wrote a best
-    print("no best checkpoint from this run; testing the weights as loaded")
-
-test_metrics = GameMetrics()
-run_epoch(test_loader, test_metrics, False, "Test")
-test_game = test_metrics.compute()
-
-
-writer.add_text(
-    "Test", "\n".join(f"**GAME-{lvl}**: {err:.3f}" for lvl, err in test_game.items())
-)
-writer.flush()
 writer.close()

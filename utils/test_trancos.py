@@ -23,6 +23,7 @@ parser.add_argument(
     default=1000.0,
     help="the network regresses density * this factor; see the note in the loss",
 )
+parser.add_argument("--seed", type=int, default=42)
 args = parser.parse_args()
 
 TARGET_SIZE = (224, 384)

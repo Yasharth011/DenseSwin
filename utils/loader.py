@@ -100,7 +100,7 @@ class CBT2015(Dataset):
 class UCSD(Dataset):
     """Dataset Loader for UCSD"""
 
-    def __init__(self, root_dir, csv_path, num_frames, transform=None):
+    def __init__(self, root_dir, csv_path, num_frames, transform=None, augment=False):
         self.csv = pd.read_csv(
             csv_path,
             names=["index", "filename", "class"],
@@ -112,12 +112,33 @@ class UCSD(Dataset):
         self.transform = transform
         self.num_frames = num_frames
         self.label_map = {"light": 0, "medium": 1, "heavy": 2}
+        self.augment = augment
+        self.jitter = v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2)
 
         #disable decord logs to remove avi missing header warning
         decord.logging.set_level(decord.logging.FATAL)
 
     def __len__(self):
         return len(self.csv)
+
+    def _augment(self, frames):
+        # same flip/jitter params applied to every frame so the clip stays
+        # temporally consistent
+        if torch.rand(()) < 0.5:
+            frames = [TF.hflip(f) for f in frames]
+
+        fn_idx, brightness, contrast, saturation, hue = self.jitter.get_params(
+            self.jitter.brightness, self.jitter.contrast, self.jitter.saturation, None
+        )
+        for fn_id in fn_idx:
+            if fn_id == 0 and brightness is not None:
+                frames = [TF.adjust_brightness(f, brightness) for f in frames]
+            elif fn_id == 1 and contrast is not None:
+                frames = [TF.adjust_contrast(f, contrast) for f in frames]
+            elif fn_id == 2 and saturation is not None:
+                frames = [TF.adjust_saturation(f, saturation) for f in frames]
+
+        return frames
 
     def __getitem__(self, idx):
 
@@ -136,6 +157,9 @@ class UCSD(Dataset):
         frames = [
             Image.fromarray(frame) for frame in vr.get_batch(frames_batch).asnumpy()
         ]
+
+        if self.augment:
+            frames = self._augment(frames)
 
         if self.transform:
             frames = [self.transform(frame) for frame in frames]

@@ -13,7 +13,7 @@ from scipy.signal import fftconvolve
 from scipy.io import loadmat
 import torch.nn.functional as F
 import torchvision.transforms.functional as TF
-
+import decord
 
 class CBT2015(Dataset):
     """Dataset Loader for CBT2015"""
@@ -112,6 +112,9 @@ class UCSD(Dataset):
         self.transform = transform
         self.num_frames = num_frames
         self.label_map = {"light": 0, "medium": 1, "heavy": 2}
+
+        #disable decord logs to remove avi missing header warning
+        decord.logging.set_level(decord.logging.FATAL)
 
     def __len__(self):
         return len(self.csv)

@@ -26,7 +26,7 @@ parser.add_argument(
     "--learning_rate",
     help="learning rate of neck, density and regression head ",
     default=1e-4,
-)
+    )
 parser.add_argument("-d", "--decay", help="weight decay", default=0.05)
 args = parser.parse_args()
 
@@ -39,6 +39,10 @@ DECAY = float(args.decay)
 checkpoint = torch.load(
     os.path.join(MODEL_CONFIG.checkpoints, CHECKPOINT), weights_only=True
 )
+checkpoint = {
+        key: value for key, value in checkpoint.items()
+        if key.startswith("backbone.") or key.startswith("density_head.")
+    }
 
 transform = v2.Compose(
     [
@@ -247,9 +251,10 @@ for fold in range(4):
                 model.state_dict(),
                 os.path.join(
                     MODEL_CONFIG.checkpoints,
-                    f"DenseSwin_UCSD_{timestamp}_fold{fold}_epoch{epoch+1}.pth",
+                    f"DenseSwin_UCSD_{timestamp}_fold{fold}.pth",
                 ),
             )
+
     # reset model for next fold
     del model, optimizer, scheduler
     torch.cuda.empty_cache()

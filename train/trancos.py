@@ -128,11 +128,9 @@ writer.add_text(
 writer.flush()
 
 os.makedirs(MODEL_CONFIG.checkpoints, exist_ok=True)
-best_path = os.path.join(
-    MODEL_CONFIG.checkpoints, f"DenseSwin_TRANCOS_{timestamp}_best.pth"
-)
-last_path = os.path.join(
-    MODEL_CONFIG.checkpoints, f"DenseSwin_TRANCOS_{timestamp}_last.pth"
+
+checkpoint_path = os.path.join(
+    MODEL_CONFIG.checkpoints, f"DenseSwin_TRANCOS_{timestamp}.pth"
 )
 
 best_game0 = float("inf")
@@ -205,11 +203,9 @@ for epoch in range(start_epoch, args.epochs):
 
     game0 = val_game["0"]
 
-    torch.save(model.state_dict(), last_path)
-
     if game0 < best_game0:
         best_game0 = game0
-        torch.save(model.state_dict(), best_path)
+        torch.save(model.state_dict(), checkpoint_path)
 
     if stopper and stopper.early_stop(game0):
         print(f"early stopping at epoch {epoch+1}")

@@ -79,6 +79,7 @@ writer = SummaryWriter(
     os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_UCSD_{timestamp}")
 )
 
+
 # 4 Fold Cross Validation
 for fold in range(4):
 
@@ -93,6 +94,11 @@ for fold in range(4):
         if name in ["backbone", "density_head"]:
             for param in layer.parameters():
                 param.requires_grad = False
+
+    checkpoint_path = os.path.join(
+                        MODEL_CONFIG.checkpoints,
+                        f"DenseSwin_UCSD_{timestamp}_fold{fold}.pth",
+                    )
 
     training_set = torch.utils.data.Subset(
         master_set, master_set.get_subset(UCSD_MASTER.train_csv, fold)
@@ -247,13 +253,7 @@ for fold in range(4):
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            torch.save(
-                model.state_dict(),
-                os.path.join(
-                    MODEL_CONFIG.checkpoints,
-                    f"DenseSwin_UCSD_{timestamp}_fold{fold}.pth",
-                ),
-            )
+            torch.save(model.state_dict(), checkpoint_path)
 
     # reset model for next fold
     del model, optimizer, scheduler

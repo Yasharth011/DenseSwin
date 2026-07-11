@@ -104,7 +104,10 @@ writer = SummaryWriter(
     os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_CBT2015_{timestamp}")
 )
 
-
+checkpoint_path = os.path.join(
+                MODEL_CONFIG.checkpoints,
+                f"DenseSwin_CBT2015_{timestamp}.pth",
+                )
 best_vloss = float("inf")
 epoch = 0
 early_stop = True
@@ -212,13 +215,7 @@ for epoch in range(EPOCHS):
     # Track best performance, and save the model's state
     if avg_vloss < best_vloss:
         best_vloss = avg_vloss
-        torch.save(
-            model.state_dict(),
-            os.path.join(
-                MODEL_CONFIG.checkpoints,
-                f"DenseSwin_CBT2015_{timestamp}.pth",
-            ),
-        )
+        torch.save(model.state_dict(), checkpoint_path)
 
 # log hyperparams
 text = f"""

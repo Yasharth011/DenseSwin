@@ -19,7 +19,7 @@ device = "cuda:0" if torch.cuda.is_available() else "cpu"
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-e", "--epochs", help="number of epoch", default=1)
-parser.add_argument("-b", "--batch", help="data batch size", default=1)
+parser.add_argument("-b", "--batch", help="data batch size", default=8)
 parser.add_argument("-c", "--checkpoint", help="model checkpoint")
 parser.add_argument(
     "-lr",
@@ -53,9 +53,18 @@ transform = v2.Compose(
     ]
 )
 
-master_set = UCSD(UCSD_MASTER.videos, UCSD_MASTER.csv, 8, transform)
+master_train_set = UCSD(UCSD_MASTER.videos, UCSD_MASTER.csv, 8, transform, augment=True)
+master_val_set = UCSD(UCSD_MASTER.videos, UCSD_MASTER.csv, 8, transform, augment=False)
 
-CEloss = torch.nn.CrossEntropyLoss()
+# inverse-frequency class weights: light/medium/heavy are 65%/18%/17% of the data
+label_map = master_train_set.label_map
+class_counts = master_train_set.csv["class"].str.strip().str.lower().value_counts()
+class_weights = torch.tensor(
+    [len(master_train_set) / (len(label_map) * class_counts[cls]) for cls in label_map],
+    dtype=torch.float32,
+).to(device)
+
+CEloss = torch.nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
 
 train_metrics = MetricCollection(
     {
@@ -79,6 +88,7 @@ writer = SummaryWriter(
     os.path.join(MODEL_CONFIG.logs, f"DenseSwinTrainer_UCSD_{timestamp}")
 )
 
+fold_best_metrics = []
 
 # 4 Fold Cross Validation
 for fold in range(4):
@@ -101,10 +111,10 @@ for fold in range(4):
                     )
 
     training_set = torch.utils.data.Subset(
-        master_set, master_set.get_subset(UCSD_MASTER.train_csv, fold)
+        master_train_set, master_train_set.get_subset(UCSD_MASTER.train_csv, fold)
     )
     validation_set = torch.utils.data.Subset(
-        master_set, master_set.get_subset(UCSD_MASTER.test_csv, fold)
+        master_val_set, master_val_set.get_subset(UCSD_MASTER.test_csv, fold)
     )
 
     training_loader = torch.utils.data.DataLoader(
@@ -130,14 +140,16 @@ for fold in range(4):
     )
 
     best_vloss = float("inf")
+    best_epoch_metrics = None
     epoch = 0
     for epoch in range(EPOCHS):
 
         """
         TRAINING
         """
-        # set model to training mode
         model.train(True)
+        model.backbone.eval()
+        model.density_head.eval()
 
         with tqdm(training_loader) as tepoch:
 
@@ -253,17 +265,36 @@ for fold in range(4):
         # Track best performance, and save the model's state
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
+            best_epoch_metrics = {
+                "accuracy": val_accuracy.item(),
+                "precision": val_precision.item(),
+                "recall": val_recall.item(),
+                "f1score": val_f1score.item(),
+            }
             torch.save(model.state_dict(), checkpoint_path)
+
+    fold_best_metrics.append(best_epoch_metrics)
 
     # reset model for next fold
     del model, optimizer, scheduler
     torch.cuda.empty_cache()
+
+mean_metrics = {
+    key: sum(fold[key] for fold in fold_best_metrics) / len(fold_best_metrics)
+    for key in fold_best_metrics[0]
+}
 
 # log hyperparams
 text = f"""
 **Epochs**: {EPOCHS}
 **Learning Rate**: Head = {LR}
 **Decay**: {DECAY}
+
+**Mean Validation Metrics (across folds, at each fold's best-val-loss epoch)**:
+- Accuracy: {mean_metrics["accuracy"]:.4f}
+- Precision: {mean_metrics["precision"]:.4f}
+- Recall: {mean_metrics["recall"]:.4f}
+- F1 Score: {mean_metrics["f1score"]:.4f}
 """
 writer.add_text("Hyperparameters", text)
 writer.flush()

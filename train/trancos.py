@@ -32,7 +32,7 @@ parser.add_argument(
     "-cw",
     "--count_weight",
     type=float,
-    default=0.01,
+    default=0.1,
     help="weight of the auxiliary count loss (0 disables it)",
 )
 parser.add_argument(
@@ -49,7 +49,7 @@ parser.add_argument("--no_amp", action="store_true", help="disable bfloat16 auto
 parser.add_argument("--no_augment", action="store_true", help="disable augmentation")
 parser.add_argument(
     "--train_split",
-    default="training",
+    default="trainval",
     choices=["training", "trainval"],
     help="'trainval' is the standard protocol when reporting on the test split",
 )
@@ -111,8 +111,8 @@ scheduler = OneCycleLR(
     anneal_strategy="cos",
 )
 
-density_loss = torch.nn.MSELoss()
-count_loss = torch.nn.SmoothL1Loss()
+density_loss = torch.nn.L1Loss()
+count_loss = torch.nn.L1Loss()
 
 train_metrics = GameMetrics()
 val_metrics = GameMetrics()
@@ -205,7 +205,7 @@ for epoch in range(start_epoch, args.epochs):
 
     game0 = val_game["0"]
 
-    torch.save(model.state_dict(), best_path)
+    torch.save(model.state_dict(), last_path)
 
     if game0 < best_game0:
         best_game0 = game0

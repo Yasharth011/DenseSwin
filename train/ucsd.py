@@ -28,6 +28,9 @@ parser.add_argument(
     default=1e-4,
     )
 parser.add_argument("-d", "--decay", help="weight decay", default=0.05)
+parser.add_argument(
+    "-do", "--dropout", help="dropout before the classification head", default=0.3
+)
 args = parser.parse_args()
 
 EPOCHS = int(args.epochs)
@@ -35,6 +38,7 @@ BATCH = int(args.batch)
 CHECKPOINT = str(args.checkpoint)
 LR = float(args.learning_rate)
 DECAY = float(args.decay)
+DROPOUT = float(args.dropout)
 
 checkpoint = torch.load(
     os.path.join(MODEL_CONFIG.checkpoints, CHECKPOINT), weights_only=True
@@ -95,7 +99,7 @@ for fold in range(4):
 
     print(f"FOLD {fold} : ")
 
-    model = DenseSwin(num_class=3)
+    model = DenseSwin(num_class=3, dropout=DROPOUT)
     model.load_state_dict(checkpoint, strict=False)
     model.to(device=device)
 
@@ -135,7 +139,7 @@ for fold in range(4):
         max_lr=[LR, LR],
         epochs=EPOCHS,
         steps_per_epoch=len(training_loader),
-        pct_start=0.1,  # 10% of training warming up
+        pct_start=0.2,  # 10% of training warming up
         anneal_strategy="cos",
     )
 
@@ -289,6 +293,7 @@ text = f"""
 **Epochs**: {EPOCHS}
 **Learning Rate**: Head = {LR}
 **Decay**: {DECAY}
+**Dropout**: {DROPOUT}
 
 **Mean Validation Metrics (across folds, at each fold's best-val-loss epoch)**:
 - Accuracy: {mean_metrics["accuracy"]:.4f}

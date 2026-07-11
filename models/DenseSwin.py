@@ -26,6 +26,7 @@ class DenseSwin(nn.Module):
         density_head: Optional[nn.Module] = None,
         neck: Optional[nn.Module] = None,
         num_class: int = 1,
+        dropout: float = 0.0,
     ):
         super().__init__()
 
@@ -61,6 +62,7 @@ class DenseSwin(nn.Module):
             self.neck = neck
 
         self.num_class = num_class
+        self.dropout = nn.Dropout(dropout)
         self.head = nn.Linear(linear_ch, self.num_class)
 
     def forward(
@@ -80,6 +82,8 @@ class DenseSwin(nn.Module):
         x = F.adaptive_avg_pool3d(x, 1)
 
         x = torch.flatten(x, 1)
+
+        x = self.dropout(x)
 
         x = self.head(x)
 
